@@ -6,16 +6,16 @@ services:
     entrypoint: ["bash", "-c", "openssl rand -base64 756 > /data/mongodb-keyfile && chmod 400 /data/mongodb-keyfile && chown mongodb:mongodb /data/mongodb-keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --keyFile /data/mongodb-keyfile"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    ports:
-      - "27017:27017"
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+  
+  
     volumes:
       - mongodb-data:/data/db
       - mongodb-config:/data/configdb
     networks:
       - aitoearn-network
     healthcheck:
-      test: ["CMD-SHELL", "mongosh mongodb://admin:password@localhost:27017/?authSource=admin --quiet --eval \"try { quit(rs.status().ok === 1 ? 0 : 1) } catch(e) { quit(1) }\""]
+      test: ["CMD-SHELL", "mongosh mongodb://admin:${MONGO_PASSWORD}@localhost:27017/?authSource=admin --quiet --eval \"try { quit(rs.status().ok === 1 ? 0 : 1) } catch(e) { quit(1) }\""]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -27,7 +27,7 @@ services:
     depends_on:
       mongodb:
         condition: service_started
-    entrypoint: ["/bin/sh", "-c", "until mongosh mongodb://admin:password@mongodb:27017/?authSource=admin --quiet --eval \"db.adminCommand('ping').ok\" >/dev/null 2>&1; do sleep 2; done; mongosh mongodb://admin:password@mongodb:27017/?authSource=admin --eval \"try { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongodb:27017'}]}) } catch(e) { if (e.codeName!=='AlreadyInitialized') throw e }\""]
+    entrypoint: ["/bin/sh", "-c", "until mongosh mongodb://admin:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin --quiet --eval \"db.adminCommand('ping').ok\" >/dev/null 2>&1; do sleep 2; done; mongosh mongodb://admin:password@mongodb:27017/?authSource=admin --eval \"try { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongodb:27017'}]}) } catch(e) { if (e.codeName!=='AlreadyInitialized') throw e }\""]
     restart: "no"
     networks:
       - aitoearn-network
@@ -36,9 +36,9 @@ services:
     image: redis:latest
     container_name: aitoearn-redis
     restart: unless-stopped
-    command: redis-server --requirepass password
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    
+      
     volumes:
       - redis-data:/data
     networks:
@@ -56,10 +56,10 @@ services:
     hostname: rustfs.local
     restart: unless-stopped
     environment:
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin
-    ports:
-      - "9001:9001"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+    
+    
     volumes:
       - rustfs-data:/data
     networks:
@@ -86,8 +86,8 @@ services:
       - init-data:/data/init
     working_dir: /app
     environment:
-      MONGO_URI: mongodb://admin:password@mongodb:27017
-      JWT_SECRET: change-this-jwt-secret
+      MONGO_URI: mongodb://admin:${MONGO_PASSWORD}@mongodb:27017
+      JWT_SECRET: ${JWT_SECRET}
       DB_NAME: aitoearn
       AUTO_LOGIN_TOKEN_PATH: /data/init/token.txt
     entrypoint: /bin/sh -c "npm install --omit=dev 2>/dev/null && node init.mjs"
@@ -104,7 +104,7 @@ services:
       - aitoearn-network
     entrypoint: >
       /bin/sh -c "
-      mc alias set rustfs http://rustfs.local:9000 rustfsadmin rustfsadmin;
+      mc alias set rustfs http://rustfs.local:9000 ${RUSTFS_ACCESS_KEY} ${RUSTFS_SECRET_KEY};
       mc mb rustfs/aitoearn --ignore-existing;
       mc anonymous set download rustfs/aitoearn;
       exit 0;
