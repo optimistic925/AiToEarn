@@ -1,0 +1,5 @@
+FROM aitoearn/aitoearn-server:latest
+WORKDIR /app
+COPY project/aitoearn-backend/apps/aitoearn-server/config/config.yaml /app/config.yaml
+COPY railway/patch-config.cjs /app/patch-config.cjs
+CMD ["sh", "-c", "node /app/patch-config.cjs && exec pm2-runtime start apps/aitoearn-server/src/main.js --name aitoearn-server -- -c config.yaml"]
