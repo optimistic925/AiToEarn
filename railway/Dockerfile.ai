@@ -1,0 +1,7 @@
+FROM aitoearn/aitoearn-ai:latest
+
+WORKDIR /app
+COPY project/aitoearn-backend/apps/aitoearn-ai/config/config.yaml /app/config.yaml
+COPY railway/patch-config.cjs /app/patch-config.cjs
+
+CMD ["sh", "-c", "node /app/patch-config.cjs && exec pm2-runtime start apps/aitoearn-ai/src/main.js --name aitoearn-ai -- -c config.yaml"]
