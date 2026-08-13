@@ -31,8 +31,8 @@ replaceAll('password: password\n', `password: ${redisPassword}\n`);
 replaceAll('accessKeyId: rustfsadmin', `accessKeyId: ${rustAccess}`);
 replaceAll('secretAccessKey: rustfsadmin', `secretAccessKey: ${rustSecret}`);
 replaceAll('endpoint: http://rustfs.local:9000', 'endpoint: http://aitoearn-rustfs.railway.internal:9000');
-replaceAll('publicEndpoint: http://localhost:9000', `${publicUrl}/oss`);
-replaceAll('cdnEndpoint: http://localhost:8080/oss', `${publicUrl}/oss`);
+replaceAll('publicEndpoint: http://localhost:9000', `publicEndpoint: ${publicUrl}/oss`);
+replaceAll('cdnEndpoint: http://localhost:8080/oss', `cdnEndpoint: ${publicUrl}/oss`);
 
 if (kind === 'ai') {
   replaceAll('baseUrl: http://aitoearn-server:3002', 'baseUrl: http://aitoearn-server.railway.internal:3002');
