@@ -100,6 +100,7 @@ export const aiModelsConfigSchema = z.object({
       modes: z.array(z.enum(['text2video', 'image2video', 'flf2video', 'lf2video', 'multi-image2video', 'multi-ref', 'video2video'])),
       resolutions: z.array(z.string()),
       durations: z.array(z.number()),
+      durationControl: z.enum(['select', 'none']).default('select'),
       maxInputImages: z.number().int().min(0),
       inputConstraints: videoModelInputConstraintsSchema,
       aspectRatios: z.array(z.string()),
