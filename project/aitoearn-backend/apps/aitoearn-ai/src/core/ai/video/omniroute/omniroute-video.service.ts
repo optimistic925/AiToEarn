@@ -5,8 +5,17 @@ import { AssetsService } from '@yikart/assets'
 import { AppException, FileUtil, ResponseCode } from '@yikart/common'
 import { AiLogChannel, AiLogRepository, AiLogStatus, AiLogType, AssetType } from '@yikart/mongodb'
 import { TaskStatus } from '../../../../common'
-import { OmniRouteLibService, OmniRouteVideoGenerationResponse } from '../../libs/omniroute'
+import {
+  getOmniRouteDecodedBase64Size,
+  OmniRouteLibService,
+  OMNIROUTE_MAX_BASE64_LENGTH,
+  OMNIROUTE_MAX_VIDEO_BYTES,
+  OmniRouteVideoGenerationResponse,
+} from '../../libs/omniroute'
 import { ModelsConfigService } from '../../models-config'
+
+const OMNIROUTE_LANDSCAPE_UI_RATIO = '16:9'
+const OMNIROUTE_LANDSCAPE_PROVIDER_RATIO = 'VIDEO_ASPECT_RATIO_LANDSCAPE'
 
 interface OmniRouteModelConfig {
   name: string
@@ -40,31 +49,42 @@ export class OmniRouteVideoService {
     }
 
     const providerModel = this.getProviderModel(modelConfig, mode, request.resolution)
+    const uiAspectRatio = request.ratio ?? (request.metadata?.['aspectRatio'] as string | undefined)
     const startedAt = new Date()
     const result = await this.omniRouteLibService.createVideo({
       model: providerModel,
       prompt: request.prompt,
       duration: request.duration,
       resolution: request.resolution,
-      aspect_ratio: request.ratio ?? (request.metadata?.['aspectRatio'] as string | undefined),
+      aspect_ratio: this.toProviderAspectRatio(uiAspectRatio),
     })
 
     const first = result.data[0]!
-    const uploaded = first.url
-      ? await this.assetsService.uploadFromUrl(request.userId, {
-          url: first.url,
+    let uploaded
+    if (first.url) {
+      uploaded = await this.assetsService.uploadFromUrl(request.userId, {
+        url: first.url,
+        type: AssetType.AiVideo,
+      }, request.model)
+    }
+    else {
+      const base64 = first.b64_json!
+      this.assertBase64SizeBeforeDecode(base64)
+      const videoBuffer = Buffer.from(base64, 'base64')
+      if (videoBuffer.length > OMNIROUTE_MAX_VIDEO_BYTES) {
+        throw this.mediaTooLarge()
+      }
+      uploaded = await this.assetsService.uploadFromBuffer(
+        request.userId,
+        videoBuffer,
+        {
           type: AssetType.AiVideo,
-        }, request.model)
-      : await this.assetsService.uploadFromBuffer(
-          request.userId,
-          Buffer.from(first.b64_json!, 'base64'),
-          {
-            type: AssetType.AiVideo,
-            mimeType: first.format === 'webm' ? 'video/webm' : 'video/mp4',
-            filename: `omniroute-video.${first.format === 'webm' ? 'webm' : 'mp4'}`,
-          },
-          request.model,
-        )
+          mimeType: first.format === 'webm' ? 'video/webm' : 'video/mp4',
+          filename: `omniroute-video.${first.format === 'webm' ? 'webm' : 'mp4'}`,
+        },
+        request.model,
+      )
+    }
 
     const elapsedMs = Date.now() - startedAt.getTime()
     const response: OmniRouteVideoAiLogResponse = {
@@ -87,7 +107,7 @@ export class OmniRouteVideoService {
         groupId: request.groupId,
         mode,
         resolution: request.resolution,
-        ratio: request.ratio ?? (request.metadata?.['aspectRatio'] as string | undefined),
+        ratio: uiAspectRatio,
         duration: request.duration,
         metadata: {
           ...(request.metadata ?? {}),
@@ -123,6 +143,34 @@ export class OmniRouteVideoService {
       videoUrl: FileUtil.buildUrl(result.videoUrl),
       error: undefined,
     }
+  }
+
+  private assertBase64SizeBeforeDecode(base64: string): void {
+    if (base64.length > OMNIROUTE_MAX_BASE64_LENGTH) {
+      throw this.mediaTooLarge()
+    }
+    const decodedSize = getOmniRouteDecodedBase64Size(base64)
+    if (decodedSize == null) {
+      throw new AppException(ResponseCode.AiCallFailed, {
+        error: 'OmniRoute returned malformed base64 video data',
+      })
+    }
+    if (decodedSize > OMNIROUTE_MAX_VIDEO_BYTES) {
+      throw this.mediaTooLarge()
+    }
+  }
+
+  private mediaTooLarge(): AppException {
+    return new AppException(ResponseCode.AiCallFailed, {
+      error: `OmniRoute video exceeds the ${OMNIROUTE_MAX_VIDEO_BYTES / 1024 / 1024} MiB media limit`,
+    })
+  }
+
+  private toProviderAspectRatio(aspectRatio?: string): string | undefined {
+    if (aspectRatio === OMNIROUTE_LANDSCAPE_UI_RATIO) {
+      return OMNIROUTE_LANDSCAPE_PROVIDER_RATIO
+    }
+    return aspectRatio
   }
 
   private getModelConfig(model: string): OmniRouteModelConfig {
