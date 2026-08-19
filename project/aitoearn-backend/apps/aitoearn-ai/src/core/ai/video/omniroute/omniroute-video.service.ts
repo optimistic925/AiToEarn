@@ -7,9 +7,9 @@ import { AiLogChannel, AiLogRepository, AiLogStatus, AiLogType, AssetType } from
 import { TaskStatus } from '../../../../common'
 import {
   getOmniRouteDecodedBase64Size,
-  OmniRouteLibService,
   OMNIROUTE_MAX_BASE64_LENGTH,
   OMNIROUTE_MAX_VIDEO_BYTES,
+  OmniRouteLibService,
   OmniRouteVideoGenerationResponse,
 } from '../../libs/omniroute'
 import { ModelsConfigService } from '../../models-config'
