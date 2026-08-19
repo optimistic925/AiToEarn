@@ -26,7 +26,7 @@ const videoModels = [
   },
 ]
 
-describe('VideoService OmniRoute integration', () => {
+describe('videoService OmniRoute integration', () => {
   const aiLogRepo = {
     getById: vi.fn(),
     updateById: vi.fn(),
