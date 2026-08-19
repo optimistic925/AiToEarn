@@ -14,7 +14,7 @@ export const OMNIROUTE_MAX_BASE64_LENGTH = 4 * Math.ceil(OMNIROUTE_MAX_VIDEO_BYT
 export const OMNIROUTE_MAX_RESPONSE_BYTES = OMNIROUTE_MAX_BASE64_LENGTH + 64 * 1024
 export const OMNIROUTE_SUPPORTED_VIDEO_FORMATS = new Set(['mp4', 'webm'])
 
-const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+const BASE64_PATTERN = /^(?:[a-z0-9+/]{4})*(?:[a-z0-9+/]{2}==|[a-z0-9+/]{3}=)?$/i
 const MAX_PROVIDER_ERROR_MESSAGE_LENGTH = 512
 
 export function getOmniRouteDecodedBase64Size(value: string): number | null {
