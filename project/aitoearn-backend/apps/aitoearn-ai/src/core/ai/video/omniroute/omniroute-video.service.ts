@@ -49,11 +49,23 @@ export class OmniRouteVideoService {
       aspect_ratio: request.ratio ?? (request.metadata?.['aspectRatio'] as string | undefined),
     })
 
-    const upstreamUrl = result.data[0]!.url
-    const uploaded = await this.assetsService.uploadFromUrl(request.userId, {
-      url: upstreamUrl,
-      type: AssetType.AiVideo,
-    }, request.model)
+    const first = result.data[0]!
+    const uploaded = first.url
+      ? await this.assetsService.uploadFromUrl(request.userId, {
+          url: first.url,
+          type: AssetType.AiVideo,
+        }, request.model)
+      : await this.assetsService.uploadFromBuffer(
+          request.userId,
+          Buffer.from(first.b64_json!, 'base64'),
+          {
+            type: AssetType.AiVideo,
+            mimeType: first.format === 'webm' ? 'video/webm' : 'video/mp4',
+            filename: `omniroute-video.${first.format === 'webm' ? 'webm' : 'mp4'}`,
+          },
+          request.model,
+        )
+
     const elapsedMs = Date.now() - startedAt.getTime()
     const response: OmniRouteVideoAiLogResponse = {
       ...result,
