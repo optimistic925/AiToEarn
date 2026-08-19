@@ -35,7 +35,8 @@ export class OmniRouteLibService {
         try {
           const response = await this.httpClient.post<OmniRouteVideoGenerationResponse>('/videos/generations', request)
           const result = response.data
-          if (!Array.isArray(result?.data) || !result.data[0]?.url) {
+          const first = result?.data?.[0]
+          if (!Array.isArray(result?.data) || (!first?.url && !first?.b64_json)) {
             throw new AppException(ResponseCode.AiCallFailed, { error: 'OmniRoute returned a malformed video response' })
           }
           return result
