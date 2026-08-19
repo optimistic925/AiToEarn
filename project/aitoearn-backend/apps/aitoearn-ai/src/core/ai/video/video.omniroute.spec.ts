@@ -1,5 +1,31 @@
-import { AiLogChannel, AiLogStatus, AiLogType } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@yikart/assets', () => ({
+  AssetsService: class AssetsService {},
+  VideoMetadataService: class VideoMetadataService {},
+}))
+
+vi.mock('@yikart/mongodb', () => ({
+  AiLogChannel: { OmniRoute: 'omniroute' },
+  AiLogStatus: { Success: 'success', Failed: 'failed', Generating: 'generating' },
+  AiLogType: { Video: 'video' },
+  AssetType: { AiVideo: 'ai-video' },
+  MediaType: { VIDEO: 'video' },
+  AiLogRepository: class AiLogRepository {},
+  MaterialGroupRepository: class MaterialGroupRepository {},
+  MediaRepository: class MediaRepository {},
+  UserRepository: class UserRepository {},
+}))
+
+vi.mock('../models-config', () => ({ ModelsConfigService: class ModelsConfigService {} }))
+vi.mock('./dashscope', () => ({ DashscopeVideoService: class DashscopeVideoService {} }))
+vi.mock('./grok', () => ({ GrokVideoService: class GrokVideoService {} }))
+vi.mock('./omniroute', () => ({ OmniRouteVideoService: class OmniRouteVideoService {} }))
+vi.mock('./openai', () => ({ OpenAIVideoService: class OpenAIVideoService {} }))
+vi.mock('./relay/relay-video.service', () => ({ RelayVideoService: class RelayVideoService {} }))
+vi.mock('./volcengine/volcengine.service', () => ({ VolcengineVideoService: class VolcengineVideoService {} }))
+
+import { AiLogChannel, AiLogStatus, AiLogType } from '@yikart/mongodb'
 import { TaskStatus } from '../../../common'
 import { VideoService } from './video.service'
 
@@ -49,7 +75,6 @@ describe('videoService OmniRoute integration', () => {
       {} as any,
       {} as any,
       { getInfo: vi.fn() } as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
