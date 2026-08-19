@@ -1,4 +1,7 @@
+import { AiLogChannel, AiLogStatus, AiLogType } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TaskStatus } from '../../../common'
+import { VideoService } from './video.service'
 
 vi.mock('@yikart/assets', () => ({
   AssetsService: class AssetsService {},
@@ -24,10 +27,6 @@ vi.mock('./omniroute', () => ({ OmniRouteVideoService: class OmniRouteVideoServi
 vi.mock('./openai', () => ({ OpenAIVideoService: class OpenAIVideoService {} }))
 vi.mock('./relay/relay-video.service', () => ({ RelayVideoService: class RelayVideoService {} }))
 vi.mock('./volcengine/volcengine.service', () => ({ VolcengineVideoService: class VolcengineVideoService {} }))
-
-import { AiLogChannel, AiLogStatus, AiLogType } from '@yikart/mongodb'
-import { TaskStatus } from '../../../common'
-import { VideoService } from './video.service'
 
 const videoModels = [
   {
