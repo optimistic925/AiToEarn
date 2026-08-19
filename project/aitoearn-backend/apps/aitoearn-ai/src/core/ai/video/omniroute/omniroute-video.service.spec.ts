@@ -1,3 +1,4 @@
+import { FileUtil } from '@yikart/common'
 import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OmniRouteVideoService } from './omniroute-video.service'
@@ -44,6 +45,7 @@ describe('omniRouteVideoService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    FileUtil.init({ endpoint: 'https://assets.test' })
     service = new OmniRouteVideoService(
       { createVideo } as any,
       { create: createAiLog } as any,
@@ -122,6 +124,7 @@ describe('omniRouteVideoService', () => {
       videoUrl: '/ai/video.mp4',
     })
     expect(result.status).toBe('success')
+    expect(result.videoUrl).toBe('https://assets.test/ai/video.mp4')
     expect(result.error).toBeUndefined()
   })
 
