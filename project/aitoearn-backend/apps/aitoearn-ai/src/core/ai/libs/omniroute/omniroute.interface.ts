@@ -8,7 +8,8 @@ export interface OmniRouteVideoGenerationRequest {
 }
 
 export interface OmniRouteVideoResultItem {
-  url: string
+  url?: string
+  b64_json?: string
   format?: string
 }
 
