@@ -68,7 +68,8 @@ export class OmniRouteVideoService {
 
     const elapsedMs = Date.now() - startedAt.getTime()
     const response: OmniRouteVideoAiLogResponse = {
-      ...result,
+      created: result.created,
+      data: [{ format: first.format }],
       videoUrl: uploaded.asset.path,
     }
 
