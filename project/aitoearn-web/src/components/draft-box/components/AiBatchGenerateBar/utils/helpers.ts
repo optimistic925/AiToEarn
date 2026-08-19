@@ -11,6 +11,7 @@ import {
   getVideoModelDurationLimits,
   getVideoModelResolutions,
 } from './constants'
+import { hasSelectableVideoDuration } from './durationControl'
 
 export const PROMPT_MAX_LENGTH = 2000
 const MEDIA_DURATION_LIMIT_TOLERANCE_SECONDS = 0.1
@@ -271,7 +272,8 @@ export function getVideoDurationLimits(
   resolutions: Record<string, string>,
   isVideoEditMode: boolean,
 ) {
-  const limits = models.map((model) => {
+  const selectableModels = models.filter(hasSelectableVideoDuration)
+  const limits = selectableModels.map((model) => {
     const resolution = resolutions[model.name] ?? getVideoModelFallbackResolution(model)
     return getVideoModelDurationLimits(model, resolution, isVideoEditMode)
   })
@@ -292,6 +294,10 @@ function getVideoModelCredits(
   const modelParams = params[model.name] ?? {}
   const resolution = modelParams.resolution ?? getVideoModelDefaultResolution(model)
   const pricing = filterVideoPricingByResolution(model.pricing, resolution, isVideoEditMode)
+
+  if (!hasSelectableVideoDuration(model))
+    return pricing[0]?.price ?? 0
+
   return (
     getNearestVideoPricing(pricing, modelParams.duration ?? model.defaults?.duration ?? 8)?.price
     ?? 0
@@ -388,6 +394,14 @@ function getResolvedVideoModelParams(
     requestedAspectRatio,
     fallback.aspectRatio,
   )
+
+  if (!hasSelectableVideoDuration(model)) {
+    return {
+      resolution,
+      aspectRatio,
+    }
+  }
+
   const requestedDuration = isVideoEditMode
     ? fallback.duration
     : (storedParams?.duration ?? fallback.duration)
@@ -446,7 +460,9 @@ export function getSeededVideoModelParamsMap(
     const stored = storedParams[model.name]
     params[model.name] = {
       resolution: stored?.resolution ?? seedParams.resolution,
-      duration: stored?.duration ?? seedParams.duration,
+      ...(hasSelectableVideoDuration(model)
+        ? { duration: stored?.duration ?? seedParams.duration }
+        : {}),
       aspectRatio: stored?.aspectRatio ?? seedParams.aspectRatio,
     }
   })
