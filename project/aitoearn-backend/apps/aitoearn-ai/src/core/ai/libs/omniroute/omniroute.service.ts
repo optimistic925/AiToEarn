@@ -84,7 +84,7 @@ export class OmniRouteLibService {
     const message = typeof nestedMessage === 'string'
       ? nestedMessage
       : typeof data?.['message'] === 'string'
-        ? data.message
+        ? data['message']
         : axiosError.message || 'OmniRoute request failed'
 
     return new AppException(ResponseCode.AiCallFailed, {
