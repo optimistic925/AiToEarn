@@ -18,7 +18,7 @@ const baseVideoModel = {
   },
 }
 
-describe('VideoModelVoSchema durationControl', () => {
+describe('video model durationControl metadata', () => {
   it('defaults existing video models to selectable duration', () => {
     const model = VideoModelVoSchema.parse(baseVideoModel)
 
