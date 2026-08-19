@@ -100,6 +100,7 @@ export const VideoModelVoSchema = z.object({
   modes: z.array(z.string()).describe('支持的模式'),
   resolutions: z.array(z.string()).describe('支持的尺寸'),
   durations: z.array(z.number()).describe('支持的时长'),
+  durationControl: z.enum(['select', 'none']).default('select').describe('时长控制：select 表示用户选择，none 表示不适用且请求应省略时长'),
   maxInputImages: z.number().describe('最大输入图片数'),
   inputConstraints: VideoModelInputConstraintsVoSchema,
   aspectRatios: z.array(z.string()).describe('支持的宽高比列表'),
