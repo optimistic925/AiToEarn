@@ -1,5 +1,14 @@
-import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@yikart/mongodb', () => ({
+  AiLogChannel: { OmniRoute: 'omniroute' },
+  AiLogStatus: { Success: 'success' },
+  AiLogType: { Video: 'video' },
+  AssetType: { AiVideo: 'ai-video' },
+  AiLogRepository: class AiLogRepository {},
+}))
+
+import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { OmniRouteVideoService } from './omniroute-video.service'
 
 const modelConfig = {
@@ -52,7 +61,11 @@ describe('omniRouteVideoService', () => {
     } as any)
 
     expect(result).toEqual({ id: 'ai-log-1' })
-    expect(uploadFromUrl).toHaveBeenCalled()
+    expect(uploadFromUrl).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ url: 'https://cdn.example/video.mp4' }),
+      'omniroute-test-video',
+    )
     expect(createAiLog).toHaveBeenCalledWith(expect.objectContaining({
       channel: AiLogChannel.OmniRoute,
       status: AiLogStatus.Success,
@@ -60,9 +73,10 @@ describe('omniRouteVideoService', () => {
   })
 
   it('uploads base64 MP4 output and excludes the base64 payload from AiLog', async () => {
+    const largeBase64 = 'A'.repeat(1024 * 1024)
     createVideo.mockResolvedValue({
       created: 123,
-      data: [{ b64_json: 'AAAAIGZ0eXBpc29t', format: 'mp4' }],
+      data: [{ b64_json: largeBase64, format: 'mp4' }],
     })
     uploadFromBuffer.mockResolvedValue({ asset: { path: '/ai/base64-video.mp4' } })
     createAiLog.mockImplementation(async (input: any) => ({ ...input, id: 'ai-log-2' }))
@@ -86,7 +100,8 @@ describe('omniRouteVideoService', () => {
     )
     const logged = createAiLog.mock.calls[0]?.[0]
     expect(logged.response.videoUrl).toBe('/ai/base64-video.mp4')
-    expect(JSON.stringify(logged.response)).not.toContain('AAAAIGZ0eXBpc29t')
+    expect(logged.response.data).toEqual([{ format: 'mp4' }])
+    expect(JSON.stringify(logged.response)).not.toContain(largeBase64.slice(0, 100))
   })
 
   it('reports completion locally without an upstream polling endpoint', () => {
