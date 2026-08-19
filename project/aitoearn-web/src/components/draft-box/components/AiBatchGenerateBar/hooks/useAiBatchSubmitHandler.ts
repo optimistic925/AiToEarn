@@ -44,6 +44,7 @@ interface UseAiBatchSubmitHandlerParams {
   effectiveQuantity: number
   imageCount: number
   aspectRatio: string
+  duration: number
   groupId?: string
   imageSize: string
   effectiveSelectedPlatforms: PlatType[]
