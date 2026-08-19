@@ -2,6 +2,7 @@ import { FileUtil } from '@yikart/common'
 import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '../../../../common'
+import { OMNIROUTE_MAX_BASE64_LENGTH } from '../../libs/omniroute'
 import { OmniRouteVideoService } from './omniroute-video.service'
 
 vi.mock('@yikart/assets', () => ({
@@ -16,9 +17,13 @@ vi.mock('@yikart/mongodb', () => ({
   AiLogRepository: class AiLogRepository {},
 }))
 
-vi.mock('../../libs/omniroute', () => ({
-  OmniRouteLibService: class OmniRouteLibService {},
-}))
+vi.mock('../../libs/omniroute', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../libs/omniroute')>()
+  return {
+    ...actual,
+    OmniRouteLibService: class OmniRouteLibService {},
+  }
+})
 
 vi.mock('../../models-config', () => ({
   ModelsConfigService: class ModelsConfigService {},
@@ -28,12 +33,12 @@ const modelConfig = {
   name: 'omniroute-test-video',
   channel: AiLogChannel.OmniRoute,
   modes: ['text2video'],
-  resolutions: ['720p'],
+  resolutions: [],
   durations: [4],
   maxInputImages: 0,
-  aspectRatios: ['9:16'],
-  defaults: { resolution: '720p', aspectRatio: '9:16', duration: 4 },
-  runtimeModels: [{ model: 'provider/video-model', mode: 'text2video', resolution: '720p' }],
+  aspectRatios: ['16:9'],
+  defaults: { aspectRatio: '16:9', duration: 4 },
+  runtimeModels: [{ model: 'provider/video-model', mode: 'text2video' }],
 }
 
 describe('omniRouteVideoService', () => {
@@ -69,12 +74,14 @@ describe('omniRouteVideoService', () => {
       model: 'omniroute-test-video',
       prompt: 'A neutral test scene',
       mode: 'text2video',
-      resolution: '720p',
-      ratio: '9:16',
+      ratio: '16:9',
       duration: 4,
     } as any)
 
     expect(result).toEqual({ id: 'ai-log-1' })
+    expect(createVideo).toHaveBeenCalledWith(expect.objectContaining({
+      aspect_ratio: 'VIDEO_ASPECT_RATIO_LANDSCAPE',
+    }))
     expect(uploadFromUrl).toHaveBeenCalledWith(
       'user-1',
       expect.objectContaining({ url: 'https://cdn.example/video.mp4' }),
@@ -83,10 +90,11 @@ describe('omniRouteVideoService', () => {
     expect(createAiLog).toHaveBeenCalledWith(expect.objectContaining({
       channel: AiLogChannel.OmniRoute,
       status: AiLogStatus.Success,
+      request: expect.objectContaining({ ratio: '16:9' }),
     }))
   })
 
-  it('uploads base64 MP4 output and excludes the base64 payload from AiLog', async () => {
+  it('uploads an under-limit base64 MP4 and excludes raw base64 from AiLog', async () => {
     const largeBase64 = 'A'.repeat(1024 * 1024)
     createVideo.mockResolvedValue({
       created: 123,
@@ -101,8 +109,7 @@ describe('omniRouteVideoService', () => {
       model: 'omniroute-test-video',
       prompt: 'test',
       mode: 'text2video',
-      resolution: '720p',
-      ratio: '9:16',
+      ratio: '16:9',
       duration: 4,
     } as any)
 
@@ -116,6 +123,48 @@ describe('omniRouteVideoService', () => {
     expect(logged.response.videoUrl).toBe('/ai/base64-video.mp4')
     expect(logged.response.data).toEqual([{ format: 'mp4' }])
     expect(JSON.stringify(logged.response)).not.toContain(largeBase64.slice(0, 100))
+  })
+
+  it('rejects an oversized base64 payload before decode/upload and never persists it', async () => {
+    const oversizedSentinel = { length: OMNIROUTE_MAX_BASE64_LENGTH + 4 }
+    createVideo.mockResolvedValue({
+      created: 123,
+      data: [{ b64_json: oversizedSentinel, format: 'mp4' }],
+    })
+
+    await expect(service.createFromRequest({
+      userId: 'user-1',
+      userType: 'user',
+      model: 'omniroute-test-video',
+      prompt: 'test',
+      mode: 'text2video',
+      ratio: '16:9',
+      duration: 4,
+    } as any)).rejects.toBeDefined()
+
+    expect(uploadFromBuffer).not.toHaveBeenCalled()
+    expect(uploadFromUrl).not.toHaveBeenCalled()
+    expect(createAiLog).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed base64 before upload', async () => {
+    createVideo.mockResolvedValue({
+      created: 123,
+      data: [{ b64_json: '%%%%', format: 'mp4' }],
+    })
+
+    await expect(service.createFromRequest({
+      userId: 'user-1',
+      userType: 'user',
+      model: 'omniroute-test-video',
+      prompt: 'test',
+      mode: 'text2video',
+      ratio: '16:9',
+      duration: 4,
+    } as any)).rejects.toBeDefined()
+
+    expect(uploadFromBuffer).not.toHaveBeenCalled()
+    expect(createAiLog).not.toHaveBeenCalled()
   })
 
   it('reports completion locally without an upstream polling endpoint', () => {
