@@ -35,7 +35,7 @@ describe('OmniRouteLibService', () => {
     } as OmniRouteConfig, availability)
   })
 
-  it('creates a video from a valid final OmniRoute response', async () => {
+  it('creates a video from a final URL response', async () => {
     mocks.post.mockResolvedValue({
       data: {
         created: 123,
@@ -43,65 +43,45 @@ describe('OmniRouteLibService', () => {
       },
     })
 
-    const result = await service.createVideo({
-      model: 'provider/model',
-      prompt: 'A neutral test scene',
-      duration: 4,
-      resolution: '720p',
-      aspect_ratio: '9:16',
+    const result = await service.createVideo({ model: 'provider/model', prompt: 'test' })
+    expect(result.data[0]?.url).toBe('https://cdn.example/video.mp4')
+  })
+
+  it('creates a video from a final base64 response', async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        created: 123,
+        data: [{ b64_json: 'AAAAIGZ0eXBpc29t', format: 'mp4' }],
+      },
     })
 
-    expect(result.data[0]?.url).toBe('https://cdn.example/video.mp4')
-    expect(mocks.post).toHaveBeenCalledWith('/videos/generations', expect.objectContaining({
-      model: 'provider/model',
-      prompt: 'A neutral test scene',
-    }))
+    const result = await service.createVideo({ model: 'provider/model', prompt: 'test' })
+    expect(result.data[0]?.b64_json).toBe('AAAAIGZ0eXBpc29t')
   })
 
   it('rejects malformed provider responses', async () => {
     mocks.post.mockResolvedValue({ data: { created: 123, data: [] } })
-
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' }))
-      .rejects.toBeInstanceOf(AppException)
+    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes provider rejection responses', async () => {
-    mocks.post.mockRejectedValue({
-      message: 'Request failed',
-      response: { status: 400, data: { error: { message: 'Invalid video model' } } },
-    })
-
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' }))
-      .rejects.toBeInstanceOf(AppException)
+    mocks.post.mockRejectedValue({ message: 'Request failed', response: { status: 400, data: { error: { message: 'Invalid video model' } } } })
+    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes unauthorized credentials without exposing the key', async () => {
-    mocks.post.mockRejectedValue({
-      message: 'Request failed',
-      response: { status: 401, data: { error: { message: 'Unauthorized' } } },
-    })
-
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' }))
-      .rejects.toBeInstanceOf(AppException)
+    mocks.post.mockRejectedValue({ message: 'Request failed', response: { status: 401, data: { error: { message: 'Unauthorized' } } } })
+    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes request timeouts', async () => {
-    mocks.post.mockRejectedValue({
-      code: 'ECONNABORTED',
-      message: 'timeout of 300000ms exceeded',
-    })
-
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' }))
-      .rejects.toBeInstanceOf(AppException)
+    mocks.post.mockRejectedValue({ code: 'ECONNABORTED', message: 'timeout of 300000ms exceeded' })
+    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('lists the authenticated video model catalog', async () => {
-    mocks.get.mockResolvedValue({
-      data: { object: 'list', data: [{ id: 'provider/model', type: 'video' }] },
-    })
-
+    mocks.get.mockResolvedValue({ data: { object: 'list', data: [{ id: 'provider/model', type: 'video' }] } })
     const result = await service.listVideoModels()
-
     expect(result.data).toEqual([{ id: 'provider/model', type: 'video' }])
     expect(mocks.get).toHaveBeenCalledWith('/videos/generations')
   })
