@@ -16,7 +16,7 @@ vi.mock('axios', () => ({
   },
 }))
 
-describe('OmniRouteLibService', () => {
+describe('omniRouteLibService', () => {
   let service: OmniRouteLibService
 
   beforeEach(() => {
