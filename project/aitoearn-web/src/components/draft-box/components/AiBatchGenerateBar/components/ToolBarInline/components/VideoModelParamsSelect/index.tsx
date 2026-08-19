@@ -3,8 +3,8 @@ import { Lock, SlidersHorizontal } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/utils/className'
-import { hasSelectableVideoDuration } from '../../../../utils/durationControl'
 import { ratioToPreviewSize } from '../../../../utils/constants'
+import { hasSelectableVideoDuration } from '../../../../utils/durationControl'
 import { pillClass } from '../../utils/styles'
 
 export function VideoModelParamsSelect({
