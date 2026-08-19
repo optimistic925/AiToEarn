@@ -8,10 +8,10 @@ import type {
   UserVideoGenerationAiLogRequest,
   VolcengineVideoAiLogRequest,
 } from '@yikart/mongodb'
-import type { OmniRouteVideoAiLogResponse } from './omniroute/omniroute-video.service'
 import type { RelayVideoCallbackDto } from '../libs/relay/relay.interface'
 import type { DashscopeVideoCallbackDto } from './dashscope'
 import type { GrokVideoCallbackDto } from './grok/grok.service'
+import type { OmniRouteVideoAiLogResponse } from './omniroute/omniroute-video.service'
 import type { OpenAIVideoCallbackDto } from './openai/openai.dto'
 import type { VolcengineCallbackDto } from './volcengine/volcengine.dto'
 import { AiLogChannel, AiLogType } from '@yikart/mongodb'
