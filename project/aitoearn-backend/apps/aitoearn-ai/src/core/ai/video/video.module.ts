@@ -3,6 +3,7 @@ import { config } from '../../../config'
 import { ModelsConfigModule } from '../models-config'
 import { DashscopeVideoModule } from './dashscope'
 import { GrokVideoModule } from './grok'
+import { OmniRouteVideoModule } from './omniroute'
 import { OpenAIVideoModule } from './openai'
 import { RelayVideoModule } from './relay'
 import { VideoTaskStatusScheduler } from './video-task-status.scheduler'
@@ -11,6 +12,7 @@ import { VideoService } from './video.service'
 import { VolcengineVideoModule } from './volcengine'
 
 const relayVideoModule = RelayVideoModule.forRoot(config.ai.relay)
+const omniRouteVideoModule = OmniRouteVideoModule.forRoot(config.ai.omniroute)
 
 @Module({
   imports: [
@@ -20,9 +22,10 @@ const relayVideoModule = RelayVideoModule.forRoot(config.ai.relay)
     GrokVideoModule,
     DashscopeVideoModule,
     relayVideoModule,
+    omniRouteVideoModule,
   ],
   controllers: [VideoController],
   providers: [VideoService, VideoTaskStatusScheduler],
-  exports: [VideoService, VolcengineVideoModule, OpenAIVideoModule, GrokVideoModule, DashscopeVideoModule, relayVideoModule],
+  exports: [VideoService, VolcengineVideoModule, OpenAIVideoModule, GrokVideoModule, DashscopeVideoModule, relayVideoModule, omniRouteVideoModule],
 })
 export class VideoModule {}
