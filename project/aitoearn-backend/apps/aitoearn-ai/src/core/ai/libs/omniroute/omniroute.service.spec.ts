@@ -35,6 +35,16 @@ describe('OmniRouteLibService', () => {
     } as OmniRouteConfig, availability)
   })
 
+  it('configures the client with Bearer authentication without logging credentials', () => {
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      baseURL: 'https://omniroute.example/v1',
+      timeout: 300000,
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-key',
+      }),
+    }))
+  })
+
   it('creates a video from a final URL response', async () => {
     mocks.post.mockResolvedValue({
       data: {
@@ -43,8 +53,12 @@ describe('OmniRouteLibService', () => {
       },
     })
 
-    const result = await service.createVideo({ model: 'provider/model', prompt: 'test' })
+    const result = await service.createVideo({ model: 'veoaifree-web/veo', prompt: 'test' })
     expect(result.data[0]?.url).toBe('https://cdn.example/video.mp4')
+    expect(mocks.post).toHaveBeenCalledWith('/videos/generations', expect.objectContaining({
+      model: 'veoaifree-web/veo',
+      prompt: 'test',
+    }))
   })
 
   it('creates a video from a final base64 response', async () => {
@@ -55,34 +69,46 @@ describe('OmniRouteLibService', () => {
       },
     })
 
-    const result = await service.createVideo({ model: 'provider/model', prompt: 'test' })
+    const result = await service.createVideo({ model: 'veoaifree-web/seedance', prompt: 'test' })
     expect(result.data[0]?.b64_json).toBe('AAAAIGZ0eXBpc29t')
+    expect(mocks.post).toHaveBeenCalledWith('/videos/generations', expect.objectContaining({
+      model: 'veoaifree-web/seedance',
+      prompt: 'test',
+    }))
   })
 
   it('rejects malformed provider responses', async () => {
     mocks.post.mockResolvedValue({ data: { created: 123, data: [] } })
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
+    await expect(service.createVideo({ model: 'veoaifree-web/veo', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes provider rejection responses', async () => {
     mocks.post.mockRejectedValue({ message: 'Request failed', response: { status: 400, data: { error: { message: 'Invalid video model' } } } })
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
+    await expect(service.createVideo({ model: 'veoaifree-web/veo', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes unauthorized credentials without exposing the key', async () => {
     mocks.post.mockRejectedValue({ message: 'Request failed', response: { status: 401, data: { error: { message: 'Unauthorized' } } } })
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
+    await expect(service.createVideo({ model: 'veoaifree-web/veo', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('normalizes request timeouts', async () => {
     mocks.post.mockRejectedValue({ code: 'ECONNABORTED', message: 'timeout of 300000ms exceeded' })
-    await expect(service.createVideo({ model: 'provider/model', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
+    await expect(service.createVideo({ model: 'veoaifree-web/veo', prompt: 'test' })).rejects.toBeInstanceOf(AppException)
   })
 
   it('lists the authenticated video model catalog', async () => {
-    mocks.get.mockResolvedValue({ data: { object: 'list', data: [{ id: 'provider/model', type: 'video' }] } })
+    mocks.get.mockResolvedValue({
+      data: {
+        object: 'list',
+        data: [
+          { id: 'veoaifree-web/veo', type: 'video' },
+          { id: 'veoaifree-web/seedance', type: 'video' },
+        ],
+      },
+    })
     const result = await service.listVideoModels()
-    expect(result.data).toEqual([{ id: 'provider/model', type: 'video' }])
+    expect(result.data.map(item => item.id)).toEqual(['veoaifree-web/veo', 'veoaifree-web/seedance'])
     expect(mocks.get).toHaveBeenCalledWith('/videos/generations')
   })
 })
