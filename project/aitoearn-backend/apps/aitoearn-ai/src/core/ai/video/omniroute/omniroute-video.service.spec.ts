@@ -14,6 +14,14 @@ vi.mock('@yikart/mongodb', () => ({
   AiLogRepository: class AiLogRepository {},
 }))
 
+vi.mock('../../libs/omniroute', () => ({
+  OmniRouteLibService: class OmniRouteLibService {},
+}))
+
+vi.mock('../../models-config', () => ({
+  ModelsConfigService: class ModelsConfigService {},
+}))
+
 const modelConfig = {
   name: 'omniroute-test-video',
   channel: AiLogChannel.OmniRoute,
