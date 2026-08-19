@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/omniroute-video-adapter
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
