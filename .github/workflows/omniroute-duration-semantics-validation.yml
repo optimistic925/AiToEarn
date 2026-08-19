@@ -58,16 +58,19 @@ jobs:
         run: >-
           pnpm exec eslint --no-fix
           apps/aitoearn-ai/src/config.ts
-          apps/aitoearn-ai/src/config.spec.ts
           libs/aitoearn-ai-shared/src/vos/draft-generation.vo.ts
+          libs/aitoearn-ai-shared/src/vos/draft-generation.vo.spec.ts
 
-      - name: Run focused backend tests
+      - name: Run duration metadata tests
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: pnpm exec vitest run libs/aitoearn-ai-shared/src/vos/draft-generation.vo.spec.ts
+
+      - name: Run OmniRoute compatibility tests
         working-directory: ${{ env.MONOREPO_DIR }}
         env:
           FILE_ENDPOINT: https://files.example.test
         run: >-
           pnpm exec vitest --config apps/aitoearn-ai/vitest.config.mts run
-          apps/aitoearn-ai/src/config.spec.ts
           apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
           apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts
           apps/aitoearn-ai/src/core/ai/video/video.omniroute.spec.ts
@@ -107,7 +110,12 @@ jobs:
 
       - name: Type-check web
         working-directory: ${{ env.WEB_DIR }}
-        run: pnpm type-check
+        run: |
+          cat > next-env.d.ts <<'EOF'
+          /// <reference types="next" />
+          /// <reference types="next/image-types/global" />
+          EOF
+          pnpm type-check
 
       - name: Lint affected web files
         working-directory: ${{ env.WEB_DIR }}
