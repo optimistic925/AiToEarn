@@ -39,4 +39,5 @@ export enum AiLogChannel {
   Gemini = 'gemini',
   Grok = 'grok',
   Relay = 'relay',
+  OmniRoute = 'omniroute',
 }

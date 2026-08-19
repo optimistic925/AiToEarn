@@ -1,0 +1,89 @@
+name: OmniRoute Adapter Validation
+
+on:
+  push:
+    branches:
+      - feature/omniroute-video-adapter
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omniroute-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NX_NO_CLOUD: true
+  NX_DAEMON: false
+  NODE_OPTIONS: --max-old-space-size=4096
+  MONOREPO_DIR: project/aitoearn-backend
+
+jobs:
+  validate-omniroute:
+    name: Typecheck, Lint, Tests, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ${{ env.MONOREPO_DIR }}/pnpm-lock.yaml
+
+      - name: Install affected workspace dependencies
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter . --filter aitoearn-ai...
+
+      - name: Type-check affected projects
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: |
+          pnpm exec tsc -p libs/aitoearn-ai-shared/tsconfig.lib.json --noEmit
+          pnpm exec tsc -p apps/aitoearn-ai/tsconfig.app.json --noEmit
+
+      - name: Lint PR #1 affected source and tests
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: >-
+          pnpm exec eslint --no-fix
+          apps/aitoearn-ai/src/config.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/index.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.config.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.interface.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.module.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.ts
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/index.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.module.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts
+          apps/aitoearn-ai/src/core/ai/video/video-ai-log.interface.ts
+          apps/aitoearn-ai/src/core/ai/video/video.module.ts
+          apps/aitoearn-ai/src/core/ai/video/video.service.ts
+          apps/aitoearn-ai/src/core/ai/video/video.omniroute.spec.ts
+          apps/aitoearn-ai/test/setup.ts
+          libs/aitoearn-ai-shared/src/enums/ai-log.enum.ts
+
+      - name: Run OmniRoute and affected video-service tests
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: >-
+          pnpm exec vitest --config apps/aitoearn-ai/vitest.config.mts run
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts
+          apps/aitoearn-ai/src/core/ai/video/video.omniroute.spec.ts
+
+      - name: Build affected projects
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: pnpm nx run-many --target=build --projects=aitoearn-ai-shared,aitoearn-ai --nxBail --outputStyle=static

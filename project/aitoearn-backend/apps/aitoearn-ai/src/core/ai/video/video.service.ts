@@ -16,6 +16,7 @@ import { TaskStatus } from '../../../common'
 import { ModelsConfigService } from '../models-config'
 import { DashscopeVideoService } from './dashscope'
 import { GrokVideoService } from './grok'
+import { OmniRouteVideoService } from './omniroute'
 import { OpenAIVideoService } from './openai'
 import { RelayVideoService } from './relay/relay-video.service'
 import { VideoAiLog } from './video-ai-log.interface'
@@ -45,6 +46,7 @@ export class VideoService {
     private readonly grokVideoService: GrokVideoService,
     private readonly dashscopeVideoService: DashscopeVideoService,
     @Optional() private readonly relayVideoService?: RelayVideoService,
+    @Optional() private readonly omniRouteVideoService?: OmniRouteVideoService,
   ) {}
 
   private requireChannel<T>(service: T | undefined): T {
@@ -93,6 +95,9 @@ export class VideoService {
       case AiLogChannel.Relay:
         response = await this.requireChannel(this.relayVideoService).createFromRequest(request)
         break
+      case AiLogChannel.OmniRoute:
+        response = await this.requireChannel(this.omniRouteVideoService).createFromRequest(request)
+        break
       default:
         throw new AppException(ResponseCode.InvalidModel)
     }
@@ -128,6 +133,9 @@ export class VideoService {
         break
       case AiLogChannel.Relay:
         input = this.requireChannel(this.relayVideoService).extractInput(aiLog.request)
+        break
+      case AiLogChannel.OmniRoute:
+        input = this.requireChannel(this.omniRouteVideoService).extractInput(aiLog.request)
         break
       default:
         input = { prompt: '' }
@@ -210,6 +218,7 @@ export class VideoService {
       case AiLogChannel.Grok:
       case AiLogChannel.Dashscope:
       case AiLogChannel.Relay:
+      case AiLogChannel.OmniRoute:
         await this.ensureSavedVideoMedia(aiLog as VideoAiLog)
     }
   }
@@ -230,6 +239,8 @@ export class VideoService {
         return this.dashscopeVideoService.getTaskResult(aiLog.response)
       case AiLogChannel.Relay:
         return this.requireChannel(this.relayVideoService).getTaskResult(aiLog.response)
+      case AiLogChannel.OmniRoute:
+        return this.requireChannel(this.omniRouteVideoService).getTaskResult(aiLog.response)
       default:
         throw new AppException(ResponseCode.InvalidAiTaskId)
     }
@@ -253,6 +264,7 @@ export class VideoService {
       case AiLogChannel.Grok:
       case AiLogChannel.Dashscope:
       case AiLogChannel.Relay:
+      case AiLogChannel.OmniRoute:
         return this.transformToCommonResponse(aiLog as VideoAiLog)
       default:
         throw new AppException(ResponseCode.InvalidAiTaskId)
@@ -269,6 +281,7 @@ export class VideoService {
         AiLogChannel.Grok,
         AiLogChannel.Dashscope,
         AiLogChannel.Relay,
+        AiLogChannel.OmniRoute,
       ],
     })
 
@@ -280,6 +293,7 @@ export class VideoService {
           case AiLogChannel.Grok:
           case AiLogChannel.Dashscope:
           case AiLogChannel.Relay:
+          case AiLogChannel.OmniRoute:
             return this.transformToCommonResponse(log as VideoAiLog)
           default:
             throw new AppException(ResponseCode.InvalidAiTaskId)

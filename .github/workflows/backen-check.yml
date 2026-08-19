@@ -71,3 +71,10 @@ jobs:
         working-directory: ${{ env.MONOREPO_DIR }}
         run: pnpm nx run-many --target=build --nxBail --outputStyle=static
 
+      - name: Run OmniRoute adapter unit tests
+        if: steps.check-changes.outputs.changed == 'true'
+        working-directory: ${{ env.MONOREPO_DIR }}
+        run: >-
+          pnpm exec vitest --config apps/aitoearn-ai/vitest.config.mts run
+          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
+          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts

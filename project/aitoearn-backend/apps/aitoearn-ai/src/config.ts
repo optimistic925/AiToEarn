@@ -8,6 +8,7 @@ import z from 'zod'
 import { dashscopeConfigSchema } from './core/ai/libs/dashscope'
 import { geminiConfigSchema } from './core/ai/libs/gemini'
 import { grokConfigSchema } from './core/ai/libs/grok'
+import { omniRouteConfigSchema } from './core/ai/libs/omniroute'
 import { openaiConfigSchema } from './core/ai/libs/openai'
 import { relayConfigSchema } from './core/ai/libs/relay/relay.config'
 import { volcengineConfigSchema } from './core/ai/libs/volcengine'
@@ -125,6 +126,7 @@ export const aiConfigSchema = z.object({
   dashscope: dashscopeConfigSchema,
   gemini: geminiConfigSchema,
   relay: relayConfigSchema.optional(),
+  omniroute: omniRouteConfigSchema.optional(),
   anthropic: z.object({
     baseUrl: z.string(),
     apiKey: z.string(),
