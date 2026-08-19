@@ -1,4 +1,6 @@
+import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { OmniRouteVideoService } from './omniroute-video.service'
 
 vi.mock('@yikart/mongodb', () => ({
   AiLogChannel: { OmniRoute: 'omniroute' },
@@ -7,9 +9,6 @@ vi.mock('@yikart/mongodb', () => ({
   AssetType: { AiVideo: 'ai-video' },
   AiLogRepository: class AiLogRepository {},
 }))
-
-import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
-import { OmniRouteVideoService } from './omniroute-video.service'
 
 const modelConfig = {
   name: 'omniroute-test-video',
