@@ -2,6 +2,10 @@ import { AiLogChannel, AiLogStatus } from '@yikart/mongodb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OmniRouteVideoService } from './omniroute-video.service'
 
+vi.mock('@yikart/assets', () => ({
+  AssetsService: class AssetsService {},
+}))
+
 vi.mock('@yikart/mongodb', () => ({
   AiLogChannel: { OmniRoute: 'omniroute' },
   AiLogStatus: { Success: 'success' },
