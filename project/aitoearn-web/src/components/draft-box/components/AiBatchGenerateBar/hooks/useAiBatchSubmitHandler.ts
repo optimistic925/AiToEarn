@@ -1,10 +1,9 @@
 import type { getVideoModelsCommonStaticConfig } from '../utils/constants'
-import type { DraftContentType, ImageModelPricing, ImageModelType, ImageTextDraftType, VideoDraftType, VideoModelType } from '@/api/ai/ai.types'
+import type { DraftContentType, ImageModelPricing, ImageModelType, ImageTextDraftType, VideoDraftType, VideoModelInfo, VideoModelType } from '@/api/ai/ai.types'
 import type { PlatType } from '@/app/config/platConfig'
 import type { IUploadedMedia } from '@/components/Chat/MediaUpload'
 import type { VideoModelParams } from '@/store/draft-box/draftBoxConfigStore'
 import { useCallback } from 'react'
-import { useDraftGenerationPricing } from '@/hooks/useDraftGenerationPricing'
 import { toast } from '@/utils/ui/toast'
 import { buildVideoModelGenerationInput, isVideoModelSubmitParamsValid } from '../utils/durationControl'
 
@@ -36,6 +35,7 @@ interface UseAiBatchSubmitHandlerParams {
   contentType: DraftContentType
   selectedImageModels: ImageModelType[]
   selectedVideoModels: VideoModelType[]
+  videoModels?: VideoModelInfo[]
   videoModelSelectionMode: 'single' | 'multiple'
   currentImageAspectRatios: string[]
   imagePricing: ImageModelPricing[]
@@ -44,7 +44,6 @@ interface UseAiBatchSubmitHandlerParams {
   effectiveQuantity: number
   imageCount: number
   aspectRatio: string
-  duration: number
   groupId?: string
   imageSize: string
   effectiveSelectedPlatforms: PlatType[]
@@ -90,6 +89,7 @@ export function useAiBatchSubmitHandler({
   contentType,
   selectedImageModels,
   selectedVideoModels,
+  videoModels,
   videoModelSelectionMode,
   currentImageAspectRatios,
   imagePricing,
@@ -98,7 +98,6 @@ export function useAiBatchSubmitHandler({
   effectiveQuantity,
   imageCount,
   aspectRatio,
-  duration,
   groupId,
   imageSize,
   effectiveSelectedPlatforms,
@@ -107,8 +106,6 @@ export function useAiBatchSubmitHandler({
   onGenerated,
   t,
 }: UseAiBatchSubmitHandlerParams) {
-  const { pricingData } = useDraftGenerationPricing()
-
   const handleSubmit = useCallback(async () => {
     // 上传中拦截
     if (isUploading) {
@@ -181,7 +178,7 @@ export function useAiBatchSubmitHandler({
       }
 
       const selectedModelInfos = selectedVideoModels.map(modelName =>
-        pricingData?.videoModels?.find(model => model.name === modelName))
+        videoModels?.find(model => model.name === modelName))
       const hasInvalidVideoModelParams = selectedVideoModels.some((modelName, index) =>
         !isVideoModelSubmitParamsValid(selectedModelInfos[index], resolvedVideoModelParams[modelName]))
       if (hasInvalidVideoModelParams) {
@@ -232,7 +229,6 @@ export function useAiBatchSubmitHandler({
   }, [
     promptValue,
     aspectRatio,
-    duration,
     localImages,
     localVideos,
     localAudios,
@@ -242,6 +238,7 @@ export function useAiBatchSubmitHandler({
     contentType,
     selectedImageModels,
     selectedVideoModels,
+    videoModels,
     resolvedVideoModelParams,
     videoModelSelectionMode,
     currentImageAspectRatios.length,
@@ -255,7 +252,6 @@ export function useAiBatchSubmitHandler({
     effectiveSelectedPlatforms,
     isDraftMode,
     captionSystemPrompt,
-    pricingData,
     imageSize,
   ])
 
