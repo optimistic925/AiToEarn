@@ -83,7 +83,6 @@ jobs:
           apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
           apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts
           apps/aitoearn-ai/src/core/ai/video/video.omniroute.spec.ts
-          apps/aitoearn-ai/src/core/ai/video/video.service.spec.ts
 
       - name: Build affected projects
         working-directory: ${{ env.MONOREPO_DIR }}
