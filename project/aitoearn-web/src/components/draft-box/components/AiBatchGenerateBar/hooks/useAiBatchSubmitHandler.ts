@@ -4,7 +4,9 @@ import type { PlatType } from '@/app/config/platConfig'
 import type { IUploadedMedia } from '@/components/Chat/MediaUpload'
 import type { VideoModelParams } from '@/store/draft-box/draftBoxConfigStore'
 import { useCallback } from 'react'
+import { useDraftGenerationPricing } from '@/hooks/useDraftGenerationPricing'
 import { toast } from '@/utils/ui/toast'
+import { buildVideoModelGenerationInput, isVideoModelSubmitParamsValid } from '../utils/durationControl'
 
 type Translate = (key: string, options?: Record<string, number | string | undefined>) => string
 type VideoModelConfig = ReturnType<typeof getVideoModelsCommonStaticConfig>
@@ -62,7 +64,7 @@ interface UseAiBatchSubmitHandlerParams {
   createBatchGenerationWithModels: (
     quantity: number,
     modelInputs: VideoModelInput[],
-    duration: number,
+    duration: number | undefined,
     aspectRatio: string,
     prompt: string | undefined,
     imageUrls: string[] | undefined,
@@ -105,6 +107,8 @@ export function useAiBatchSubmitHandler({
   onGenerated,
   t,
 }: UseAiBatchSubmitHandlerParams) {
+  const { pricingData } = useDraftGenerationPricing()
+
   const handleSubmit = useCallback(async () => {
     // 上传中拦截
     if (isUploading) {
@@ -175,10 +179,11 @@ export function useAiBatchSubmitHandler({
         toast.warning(t('detail.noCommonModelParams'))
         return
       }
-      const hasInvalidVideoModelParams = selectedVideoModels.some((model) => {
-        const params = resolvedVideoModelParams[model]
-        return !params?.aspectRatio || params.duration === undefined
-      })
+
+      const selectedModelInfos = selectedVideoModels.map(modelName =>
+        pricingData?.videoModels?.find(model => model.name === modelName))
+      const hasInvalidVideoModelParams = selectedVideoModels.some((modelName, index) =>
+        !isVideoModelSubmitParamsValid(selectedModelInfos[index], resolvedVideoModelParams[modelName]))
       if (hasInvalidVideoModelParams) {
         toast.warning(t('detail.noCommonModelParams'))
         return
@@ -186,17 +191,16 @@ export function useAiBatchSubmitHandler({
 
       const videoUrls = localVideos.filter(v => v.url).map(v => v.url)
       const audioUrls = localAudios.filter(a => a.url).map(a => a.url)
-      const modelInputs = selectedVideoModels.map(model => ({
-        modelType: model,
-        resolution: resolvedVideoModelParams[model]?.resolution || undefined,
-        duration: resolvedVideoModelParams[model]?.duration,
-        aspectRatio: resolvedVideoModelParams[model]?.aspectRatio,
-      }))
+      const modelInputs = selectedModelInfos.flatMap((modelInfo, index) => {
+        if (!modelInfo)
+          return []
+        return [buildVideoModelGenerationInput(modelInfo, resolvedVideoModelParams[selectedVideoModels[index]!])]
+      })
 
       const result = await createBatchGenerationWithModels(
         effectiveQuantity,
         modelInputs,
-        duration,
+        undefined,
         aspectRatio,
         promptValue.trim() || undefined,
         imageUrls.length > 0 ? imageUrls : undefined,
@@ -251,6 +255,8 @@ export function useAiBatchSubmitHandler({
     effectiveSelectedPlatforms,
     isDraftMode,
     captionSystemPrompt,
+    pricingData,
+    imageSize,
   ])
 
   // Prompts 探索页 URL（根据当前模型族切换 grok / seedance 提示词页）
