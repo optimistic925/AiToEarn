@@ -14,7 +14,7 @@ const modelConfig = {
   runtimeModels: [{ model: 'provider/video-model', mode: 'text2video', resolution: '720p' }],
 }
 
-describe('OmniRouteVideoService', () => {
+describe('omniRouteVideoService', () => {
   const createVideo = vi.fn()
   const createAiLog = vi.fn()
   const uploadFromUrl = vi.fn()
@@ -33,28 +33,49 @@ describe('OmniRouteVideoService', () => {
   })
 
   it('normalizes a completed URL response into a successful local video task', async () => {
-    createVideo.mockResolvedValue({ created: 123, data: [{ url: 'https://cdn.example/video.mp4', format: 'mp4' }] })
+    createVideo.mockResolvedValue({
+      created: 123,
+      data: [{ url: 'https://cdn.example/video.mp4', format: 'mp4' }],
+    })
     uploadFromUrl.mockResolvedValue({ asset: { path: '/ai/video.mp4' } })
     createAiLog.mockImplementation(async (input: any) => ({ ...input, id: 'ai-log-1' }))
 
     const result = await service.createFromRequest({
-      userId: 'user-1', userType: 'user', model: 'omniroute-test-video', prompt: 'A neutral test scene',
-      mode: 'text2video', resolution: '720p', ratio: '9:16', duration: 4,
+      userId: 'user-1',
+      userType: 'user',
+      model: 'omniroute-test-video',
+      prompt: 'A neutral test scene',
+      mode: 'text2video',
+      resolution: '720p',
+      ratio: '9:16',
+      duration: 4,
     } as any)
 
     expect(result).toEqual({ id: 'ai-log-1' })
     expect(uploadFromUrl).toHaveBeenCalled()
-    expect(createAiLog).toHaveBeenCalledWith(expect.objectContaining({ channel: AiLogChannel.OmniRoute, status: AiLogStatus.Success }))
+    expect(createAiLog).toHaveBeenCalledWith(expect.objectContaining({
+      channel: AiLogChannel.OmniRoute,
+      status: AiLogStatus.Success,
+    }))
   })
 
   it('uploads base64 MP4 output and excludes the base64 payload from AiLog', async () => {
-    createVideo.mockResolvedValue({ created: 123, data: [{ b64_json: 'AAAAIGZ0eXBpc29t', format: 'mp4' }] })
+    createVideo.mockResolvedValue({
+      created: 123,
+      data: [{ b64_json: 'AAAAIGZ0eXBpc29t', format: 'mp4' }],
+    })
     uploadFromBuffer.mockResolvedValue({ asset: { path: '/ai/base64-video.mp4' } })
     createAiLog.mockImplementation(async (input: any) => ({ ...input, id: 'ai-log-2' }))
 
     await service.createFromRequest({
-      userId: 'user-1', userType: 'user', model: 'omniroute-test-video', prompt: 'test',
-      mode: 'text2video', resolution: '720p', ratio: '9:16', duration: 4,
+      userId: 'user-1',
+      userType: 'user',
+      model: 'omniroute-test-video',
+      prompt: 'test',
+      mode: 'text2video',
+      resolution: '720p',
+      ratio: '9:16',
+      duration: 4,
     } as any)
 
     expect(uploadFromBuffer).toHaveBeenCalledWith(
@@ -69,14 +90,22 @@ describe('OmniRouteVideoService', () => {
   })
 
   it('reports completion locally without an upstream polling endpoint', () => {
-    const result = service.getTaskResult({ created: 123, data: [{ format: 'mp4' }], videoUrl: '/ai/video.mp4' })
+    const result = service.getTaskResult({
+      created: 123,
+      data: [{ format: 'mp4' }],
+      videoUrl: '/ai/video.mp4',
+    })
     expect(result.status).toBe('success')
     expect(result.error).toBeUndefined()
   })
 
   it('does not advertise or accept a mode absent from the model configuration', async () => {
     await expect(service.createFromRequest({
-      userId: 'user-1', userType: 'user', model: 'omniroute-test-video', prompt: 'test', mode: 'image2video',
+      userId: 'user-1',
+      userType: 'user',
+      model: 'omniroute-test-video',
+      prompt: 'test',
+      mode: 'image2video',
     } as any)).rejects.toBeDefined()
     expect(createVideo).not.toHaveBeenCalled()
   })
