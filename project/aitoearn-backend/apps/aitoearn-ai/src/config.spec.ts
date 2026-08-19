@@ -26,7 +26,7 @@ const baseVideoModel = {
   },
 }
 
-function parseVideoModel(model: typeof baseVideoModel & { durationControl?: 'select' | 'none' }) {
+function parseVideoModel(model: unknown) {
   const result = aiModelsConfigSchema.parse({
     chat: [],
     image: {
