@@ -1,0 +1,469 @@
+name: PR2 Targeted Controller and Production Path
+
+on:
+  push:
+    branches:
+      - feature/omniroute-duration-semantics
+
+permissions:
+  contents: write
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/omniroute-duration-semantics
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: project/aitoearn-web/pnpm-lock.yaml
+
+      - name: Patch controller duration reset paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('project/aitoearn-web/src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts')
+          text = path.read_text()
+
+          def replace_once(old: str, new: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, found {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "} from '../utils/constants'\nimport {\n  buildAggregateImagePricing,",
+              "} from '../utils/constants'\nimport { hasSelectableVideoDuration } from '../utils/durationControl'\nimport {\n  buildAggregateImagePricing,",
+          )
+
+          old_migration = """        videoModelParams: fallback
+          ? {
+              [fallback]: {
+                resolution: fallbackResolution,
+                duration,
+                aspectRatio,
+              },
+            }
+          : {},"""
+          new_migration = """        videoModelParams: fallback
+          ? {
+              [fallback]: {
+                resolution: fallbackResolution,
+                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
+                aspectRatio,
+              },
+            }
+          : {},"""
+          if text.count(old_migration) != 1:
+              raise SystemExit(f'expected one migration config block, found {text.count(old_migration)}')
+          text = text.replace(old_migration, new_migration, 1)
+
+          old_set_migration = """          ? {
+              [fallback]: {
+                resolution: fallbackResolution,
+                duration,
+                aspectRatio,
+              },
+            }
+          : {},
+      )"""
+          new_set_migration = """          ? {
+              [fallback]: {
+                resolution: fallbackResolution,
+                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
+                aspectRatio,
+              },
+            }
+          : {},
+      )"""
+          if text.count(old_set_migration) != 1:
+              raise SystemExit(f'expected one migration setter block, found {text.count(old_set_migration)}')
+          text = text.replace(old_set_migration, new_set_migration, 1)
+
+          replace_once(
+              "      const nextPrimaryDuration = nextPrimaryParams?.duration ?? duration\n",
+              "      const nextPrimaryDuration = hasSelectableVideoDuration(modelInfos[0])\n        ? (nextPrimaryParams?.duration ?? duration)\n        : undefined\n",
+          )
+          replace_once(
+              "      if (videoModelSelectionMode === 'single') {\n        setDuration(nextPrimaryDuration)\n        setAspectRatio(nextPrimaryAspectRatio)\n      }",
+              "      if (videoModelSelectionMode === 'single') {\n        if (nextPrimaryDuration !== undefined)\n          setDuration(nextPrimaryDuration)\n        setAspectRatio(nextPrimaryAspectRatio)\n      }",
+          )
+          replace_once(
+              "        duration: videoModelSelectionMode === 'single' ? nextPrimaryDuration : duration,",
+              "        duration:\n          videoModelSelectionMode === 'single' && nextPrimaryDuration !== undefined\n            ? nextPrimaryDuration\n            : duration,",
+          )
+          replace_once(
+              "      if (mode === 'single' && nextPrimaryParams?.duration !== undefined) {\n        setDuration(nextPrimaryParams.duration)\n      }",
+              "      if (\n        mode === 'single'\n        && hasSelectableVideoDuration(modelInfos[0])\n        && nextPrimaryParams?.duration !== undefined\n      ) {\n        setDuration(nextPrimaryParams.duration)\n      }",
+          )
+          replace_once(
+              "        duration: mode === 'single' ? (nextPrimaryParams?.duration ?? duration) : duration,",
+              "        duration:\n          mode === 'single'\n          && hasSelectableVideoDuration(modelInfos[0])\n          && nextPrimaryParams?.duration !== undefined\n            ? nextPrimaryParams.duration\n            : duration,",
+          )
+          replace_once(
+              """      videoModelParams: firstVideoModel
+        ? {
+            [firstVideoModel]: {
+              resolution: firstVideoResolution,
+              duration: 8,
+              aspectRatio: nextAspectRatio,
+            },
+          }
+        : {},""",
+              """      videoModelParams: firstVideoModel
+        ? {
+            [firstVideoModel]: {
+              resolution: firstVideoResolution,
+              ...(hasSelectableVideoDuration(firstVideoModelInfo) ? { duration: 8 } : {}),
+              aspectRatio: nextAspectRatio,
+            },
+          }
+        : {},""",
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Add executable production-path and UI tests
+        run: |
+          cat > project/aitoearn-web/tests/omniroute-duration-production-path.spec.ts <<'EOF'
+          import type { DraftGenerationPricingVo, VideoModelInfo } from '../src/api/ai/ai.types'
+          import { createElement } from 'react'
+          import { renderToString } from 'react-dom/server'
+          import { expect, test } from '@playwright/test'
+          import http from '../src/utils/request'
+          import { toast } from '../src/utils/ui/toast'
+          import { useAiBatchSubmitHandler } from '../src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchSubmitHandler'
+          import { usePlanDetailStore } from '../src/store/draft-box/planDetailStore'
+
+          function videoModel(overrides: Partial<VideoModelInfo> = {}): VideoModelInfo {
+            return {
+              name: 'selectable-video',
+              description: 'Selectable Video',
+              channel: 'openai',
+              modes: ['text2video'],
+              resolutions: ['720p'],
+              durations: [4, 8, 12],
+              maxInputImages: 0,
+              aspectRatios: ['16:9'],
+              tags: [],
+              defaults: { resolution: '720p', aspectRatio: '16:9', duration: 8 },
+              pricing: [],
+              ...overrides,
+            }
+          }
+
+          type PricingCache = {
+            data: DraftGenerationPricingVo | null
+            promise: Promise<DraftGenerationPricingVo | null> | null
+          }
+
+          function primePricing(videoModels: VideoModelInfo[]) {
+            const globalPricing = globalThis as typeof globalThis & {
+              __draftGenerationPricingCache?: PricingCache
+            }
+            globalPricing.__draftGenerationPricingCache = {
+              data: { imageModels: [], videoModels } as DraftGenerationPricingVo,
+              promise: null,
+            }
+          }
+
+          function renderSubmitHandler(params: Parameters<typeof useAiBatchSubmitHandler>[0]) {
+            let submit: (() => Promise<void>) | undefined
+            function Harness() {
+              submit = useAiBatchSubmitHandler(params)
+              return createElement('span')
+            }
+            renderToString(createElement(Harness))
+            if (!submit)
+              throw new Error('submit handler was not created')
+            return submit
+          }
+
+          type HttpPostResult = { code: number, data?: { taskIds?: string[] }, message?: string }
+          type HttpPost = (url: string, data?: unknown) => Promise<HttpPostResult>
+
+          async function withApiCapture(run: (posted: Record<string, unknown>[]) => Promise<void>) {
+            const client = http as unknown as { post: HttpPost }
+            const originalPost = client.post
+            const originalSuccess = toast.success
+            const originalWarning = toast.warning
+            const originalError = toast.error
+            const posted: Record<string, unknown>[] = []
+            client.post = async (url, data) => {
+              if (url !== 'ai/draft-generation/v2')
+                throw new Error(`unexpected POST ${url}`)
+              const wireBody = JSON.parse(JSON.stringify(data)) as Record<string, unknown>
+              posted.push(wireBody)
+              return { code: 0, data: { taskIds: [`task-${posted.length}`] } }
+            }
+            toast.success = (() => undefined) as typeof toast.success
+            toast.warning = (() => undefined) as typeof toast.warning
+            toast.error = (() => undefined) as typeof toast.error
+            try {
+              await run(posted)
+            }
+            finally {
+              client.post = originalPost
+              toast.success = originalSuccess
+              toast.warning = originalWarning
+              toast.error = originalError
+            }
+          }
+
+          function baseParams(videoModels: VideoModelInfo[], selectedVideoModels: string[]) {
+            primePricing(videoModels)
+            const actualCreate = usePlanDetailStore.getState().createBatchGenerationWithModels
+            let capturedModelInputs: Parameters<typeof actualCreate>[1] = []
+            let capturedGlobalDuration: number | undefined = 999
+            const createBatchGenerationWithModels: typeof actualCreate = async (...args) => {
+              capturedModelInputs = args[1]
+              capturedGlobalDuration = args[2]
+              return actualCreate(...args)
+            }
+            const params: Parameters<typeof useAiBatchSubmitHandler>[0] = {
+              isUploading: false,
+              promptValue: 'test prompt',
+              isDraftMode: false,
+              captionSystemPrompt: '',
+              localImages: [],
+              localVideos: [],
+              localAudios: [],
+              contentType: 'video',
+              selectedImageModels: [],
+              selectedVideoModels,
+              videoModelSelectionMode: selectedVideoModels.length > 1 ? 'multiple' : 'single',
+              currentImageAspectRatios: [],
+              imagePricing: [],
+              currentVideoModelConfig: { supportedRatios: new Set(['16:9']) } as Parameters<typeof useAiBatchSubmitHandler>[0]['currentVideoModelConfig'],
+              resolvedVideoModelParams: {},
+              effectiveQuantity: 1,
+              imageCount: 1,
+              aspectRatio: '16:9',
+              duration: 8,
+              groupId: 'group-test',
+              imageSize: '1K',
+              effectiveSelectedPlatforms: [],
+              createImageTextBatchGenerationWithModels: async () => ({ success: false, successCount: 0, failedCount: 0 }),
+              createBatchGenerationWithModels,
+              t: key => key,
+            }
+            return {
+              params,
+              getCapturedModelInputs: () => capturedModelInputs,
+              getCapturedGlobalDuration: () => capturedGlobalDuration,
+            }
+          }
+
+          test('actual hook and store omit duration for a no-duration OmniRoute model', async () => {
+            const veo = videoModel({
+              name: 'veoaifree-web/veo',
+              channel: 'omniroute',
+              resolutions: [],
+              durations: [],
+              durationControl: 'none',
+              defaults: { aspectRatio: '16:9' },
+            })
+            const capture = baseParams([veo], [veo.name])
+            capture.params.resolvedVideoModelParams = {
+              [veo.name]: { aspectRatio: '16:9', duration: 8 },
+            }
+
+            await withApiCapture(async (posted) => {
+              await renderSubmitHandler(capture.params)()
+              expect(capture.getCapturedModelInputs()).toHaveLength(1)
+              expect(capture.getCapturedModelInputs()[0]?.duration).toBeUndefined()
+              expect(capture.getCapturedGlobalDuration()).toBeUndefined()
+              expect(posted).toHaveLength(1)
+              expect(posted[0]?.model).toBe(veo.name)
+              expect(posted[0]).not.toHaveProperty('duration')
+            })
+          })
+
+          test('mixed-model actual path preserves selectable duration without leaking it to OmniRoute', async () => {
+            const selectable = videoModel({ name: 'sora-compatible-duration-model', durationControl: 'select' })
+            const seedance = videoModel({
+              name: 'veoaifree-web/seedance',
+              channel: 'omniroute',
+              resolutions: [],
+              durations: [],
+              durationControl: 'none',
+              defaults: { aspectRatio: '16:9' },
+            })
+            const capture = baseParams([selectable, seedance], [selectable.name, seedance.name])
+            capture.params.resolvedVideoModelParams = {
+              [selectable.name]: { resolution: '720p', duration: 12, aspectRatio: '16:9' },
+              [seedance.name]: { duration: 4, aspectRatio: '16:9' },
+            }
+
+            await withApiCapture(async (posted) => {
+              await renderSubmitHandler(capture.params)()
+              const inputs = capture.getCapturedModelInputs()
+              expect(inputs.find(input => input.modelType === selectable.name)?.duration).toBe(12)
+              expect(inputs.find(input => input.modelType === seedance.name)?.duration).toBeUndefined()
+              expect(capture.getCapturedGlobalDuration()).toBeUndefined()
+              const selectableRequest = posted.find(request => request.model === selectable.name)
+              const seedanceRequest = posted.find(request => request.model === seedance.name)
+              expect(selectableRequest?.duration).toBe(12)
+              expect(seedanceRequest).not.toHaveProperty('duration')
+            })
+          })
+          EOF
+
+          cat > project/aitoearn-web/tests/omniroute-duration-toolbar-render.spec.ts <<'EOF'
+          import type { VideoModelInfo } from '../src/api/ai/ai.types'
+          import type { AiBatchGenerateBarLocalState } from '../src/components/draft-box/components/AiBatchGenerateBar/store'
+          import type { ToolBarInlineProps } from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/types'
+          import { createElement } from 'react'
+          import { renderToString } from 'react-dom/server'
+          import { expect, test } from '@playwright/test'
+          import ToolBarInline from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline'
+
+          function model(name: string, durationControl: 'select' | 'none'): VideoModelInfo {
+            return {
+              name,
+              description: name,
+              channel: durationControl === 'none' ? 'omniroute' : 'openai',
+              modes: ['text2video'],
+              resolutions: durationControl === 'none' ? [] : ['720p'],
+              durations: durationControl === 'none' ? [] : [4, 8, 12],
+              durationControl,
+              maxInputImages: 0,
+              aspectRatios: ['16:9'],
+              tags: [],
+              defaults: durationControl === 'none'
+                ? { aspectRatio: '16:9' }
+                : { resolution: '720p', aspectRatio: '16:9', duration: 8 },
+              pricing: [],
+            }
+          }
+
+          function renderToolbar(videoModel: VideoModelInfo) {
+            const fallbackState: AiBatchGenerateBarLocalState = {
+              promptValue: '',
+              promptEditorOpen: false,
+              aspectRatio: '16:9',
+              duration: 8,
+              resolution: videoModel.defaults?.resolution ?? '',
+              modelType: videoModel.name,
+              selectedVideoModels: [videoModel.name],
+              videoModelSelectionMode: 'single',
+              videoModelResolutions: {},
+              videoModelParams: {
+                [videoModel.name]: { aspectRatio: '16:9', duration: 8 },
+              },
+              contentType: 'video',
+              imageModel: '',
+              selectedImageModels: [],
+              imageModelSelectionMode: 'single',
+              imageCount: 1,
+              imageSize: '1K',
+              quantity: 1,
+              isDraftMode: false,
+              captionSystemPrompt: '',
+              captionSystemPromptDefault: '',
+              moreOptionsOpen: false,
+              selectedPlatforms: [],
+            }
+            const noop = () => undefined
+            const props: ToolBarInlineProps = {
+              configKey: `test-${videoModel.name}`,
+              fallbackState,
+              imageAspectRatios: [],
+              imageModelOptions: [],
+              imagePricing: [],
+              videoModels: [videoModel],
+              videoAspectRatios: ['16:9'],
+              videoResolutions: videoModel.resolutions,
+              videoModelOptions: [{ value: videoModel.name, label: videoModel.name }],
+              resolvedVideoModelParams: fallbackState.videoModelParams,
+              videoDurationLimits: { min: 4, max: 15 },
+              isVideoEditMode: false,
+              inputVideoDuration: null,
+              isLoading: false,
+              promptsExploreUrl: '',
+              promptsExploreLabel: '',
+              effectiveLimitsDetailed: {} as ToolBarInlineProps['effectiveLimitsDetailed'],
+              disabledPlatforms: new Map(),
+              actions: {
+                onDraftModeChange: noop,
+                onContentTypeChange: noop,
+                onVideoModelsChange: noop,
+                onVideoModelSelectionModeChange: noop,
+                onVideoModelParamChange: noop,
+                onResolutionChange: noop,
+                onAspectRatioChange: noop,
+                onDurationChange: noop,
+                onQuantityChange: noop,
+                onImageModelsChange: noop,
+                onImageModelSelectionModeChange: noop,
+                onImageCountChange: noop,
+                onImageSizeChange: noop,
+                onPlatformsChange: noop,
+                onMoreOptionsChange: noop,
+                onSubmit: noop,
+              },
+            }
+            return renderToString(createElement(ToolBarInline, props))
+          }
+
+          for (const modelName of ['veoaifree-web/veo', 'veoaifree-web/seedance']) {
+            test(`${modelName} renders the real toolbar without a duration control`, () => {
+              const html = renderToolbar(model(modelName, 'none'))
+              expect(html).not.toContain('data-testid="draftbox-ai-duration"')
+            })
+          }
+
+          test('selectable model baseline renders the real duration control', () => {
+            const html = renderToolbar(model('selectable-video', 'select'))
+            expect(html).toContain('data-testid="draftbox-ai-duration"')
+          })
+          EOF
+
+      - name: Install web dependencies
+        working-directory: project/aitoearn-web
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Targeted type-check and lint
+        working-directory: project/aitoearn-web
+        run: |
+          cat > next-env.d.ts <<'EOF'
+          /// <reference types="next" />
+          /// <reference types="next/image-types/global" />
+          EOF
+          pnpm type-check
+          pnpm exec eslint --no-fix \
+            src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts \
+            tests/omniroute-duration-semantics.spec.ts \
+            tests/omniroute-duration-production-path.spec.ts \
+            tests/omniroute-duration-toolbar-render.spec.ts
+
+      - name: Run affected duration tests only
+        working-directory: project/aitoearn-web
+        run: |
+          pnpm exec playwright test \
+            tests/omniroute-duration-semantics.spec.ts \
+            tests/omniroute-duration-production-path.spec.ts \
+            tests/omniroute-duration-toolbar-render.spec.ts \
+            --workers=1
+
+      - name: Commit validated corrections and remove temporary workflow
+        run: |
+          rm .github/workflows/pr2-targeted-controller-tests.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(video): complete no-duration controller and integration coverage"
+          git push origin HEAD:feature/omniroute-duration-semantics
