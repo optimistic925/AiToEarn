@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: omniroute-duration-semantics-${{ github.ref }}
@@ -17,7 +17,6 @@ concurrency:
 
 jobs:
   backend:
-    if: ${{ !contains(github.event.head_commit.message || '', '[pr2-targeted]') }}
     name: Backend Typecheck, Lint, Tests, Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -81,7 +80,6 @@ jobs:
         run: pnpm nx run-many --target=build --projects=aitoearn-ai-shared,aitoearn-ai --nxBail --outputStyle=static
 
   web:
-    if: ${{ !contains(github.event.head_commit.message || '', '[pr2-targeted]') }}
     name: Web Typecheck, Lint, Tests, Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -137,187 +135,3 @@ jobs:
       - name: Build web
         working-directory: ${{ env.WEB_DIR }}
         run: pnpm build
-
-  targeted-controller:
-    if: ${{ contains(github.event.head_commit.message || '', '[pr2-targeted]') }}
-    name: Targeted Controller, Submission Path, UI
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout feature branch
-        uses: actions/checkout@v4
-        with:
-          ref: feature/omniroute-duration-semantics
-          fetch-depth: 0
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: project/aitoearn-web/pnpm-lock.yaml
-
-      - name: Patch controller duration reset paths
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('project/aitoearn-web/src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts')
-          text = path.read_text()
-
-          def replace_once(old: str, new: str):
-              global text
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'expected exactly one match, found {count}: {old[:100]!r}')
-              text = text.replace(old, new, 1)
-
-          replace_once(
-              "} from '../utils/constants'\nimport {\n  buildAggregateImagePricing,",
-              "} from '../utils/constants'\nimport { hasSelectableVideoDuration } from '../utils/durationControl'\nimport {\n  buildAggregateImagePricing,",
-          )
-
-          old_migration = """        videoModelParams: fallback
-          ? {
-              [fallback]: {
-                resolution: fallbackResolution,
-                duration,
-                aspectRatio,
-              },
-            }
-          : {},"""
-          new_migration = """        videoModelParams: fallback
-          ? {
-              [fallback]: {
-                resolution: fallbackResolution,
-                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
-                aspectRatio,
-              },
-            }
-          : {},"""
-          if text.count(old_migration) != 1:
-              raise SystemExit(f'expected one migration config block, found {text.count(old_migration)}')
-          text = text.replace(old_migration, new_migration, 1)
-
-          old_set_migration = """          ? {
-              [fallback]: {
-                resolution: fallbackResolution,
-                duration,
-                aspectRatio,
-              },
-            }
-          : {},
-      )"""
-          new_set_migration = """          ? {
-              [fallback]: {
-                resolution: fallbackResolution,
-                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
-                aspectRatio,
-              },
-            }
-          : {},
-      )"""
-          if text.count(old_set_migration) != 1:
-              raise SystemExit(f'expected one migration setter block, found {text.count(old_set_migration)}')
-          text = text.replace(old_set_migration, new_set_migration, 1)
-
-          replace_once(
-              "      const nextPrimaryDuration = nextPrimaryParams?.duration ?? duration\n",
-              "      const nextPrimaryDuration = hasSelectableVideoDuration(modelInfos[0])\n        ? (nextPrimaryParams?.duration ?? duration)\n        : undefined\n",
-          )
-          replace_once(
-              "      if (videoModelSelectionMode === 'single') {\n        setDuration(nextPrimaryDuration)\n        setAspectRatio(nextPrimaryAspectRatio)\n      }",
-              "      if (videoModelSelectionMode === 'single') {\n        if (nextPrimaryDuration !== undefined)\n          setDuration(nextPrimaryDuration)\n        setAspectRatio(nextPrimaryAspectRatio)\n      }",
-          )
-          replace_once(
-              "        duration: videoModelSelectionMode === 'single' ? nextPrimaryDuration : duration,",
-              "        duration:\n          videoModelSelectionMode === 'single' && nextPrimaryDuration !== undefined\n            ? nextPrimaryDuration\n            : duration,",
-          )
-          replace_once(
-              "      if (mode === 'single' && nextPrimaryParams?.duration !== undefined) {\n        setDuration(nextPrimaryParams.duration)\n      }",
-              "      if (\n        mode === 'single'\n        && hasSelectableVideoDuration(modelInfos[0])\n        && nextPrimaryParams?.duration !== undefined\n      ) {\n        setDuration(nextPrimaryParams.duration)\n      }",
-          )
-          replace_once(
-              "        duration: mode === 'single' ? (nextPrimaryParams?.duration ?? duration) : duration,",
-              "        duration:\n          mode === 'single'\n          && hasSelectableVideoDuration(modelInfos[0])\n          && nextPrimaryParams?.duration !== undefined\n            ? nextPrimaryParams.duration\n            : duration,",
-          )
-          replace_once(
-              """      videoModelParams: firstVideoModel
-        ? {
-            [firstVideoModel]: {
-              resolution: firstVideoResolution,
-              duration: 8,
-              aspectRatio: nextAspectRatio,
-            },
-          }
-        : {},""",
-              """      videoModelParams: firstVideoModel
-        ? {
-            [firstVideoModel]: {
-              resolution: firstVideoResolution,
-              ...(hasSelectableVideoDuration(firstVideoModelInfo) ? { duration: 8 } : {}),
-              aspectRatio: nextAspectRatio,
-            },
-          }
-        : {},""",
-          )
-
-          path.write_text(text)
-          PY
-
-      - name: Add executable production-path and UI tests
-        run: |
-          cp .github/workflows/pr2-targeted-controller-tests.yml /tmp/pr2-targeted.yml
-          python - <<'PY'
-          from pathlib import Path
-          from textwrap import dedent
-          text = Path('/tmp/pr2-targeted.yml').read_text()
-          start = text.index("          cat > project/aitoearn-web/tests/omniroute-duration-production-path.spec.ts <<'EOF'\n")
-          end = text.index("\n      - name: Install web dependencies", start)
-          commands = dedent(text[start:end])
-          Path('/tmp/create-tests.sh').write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + commands)
-          PY
-          bash /tmp/create-tests.sh
-
-      - name: Install web dependencies
-        working-directory: project/aitoearn-web
-        run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Targeted type-check and lint
-        working-directory: project/aitoearn-web
-        run: |
-          cat > next-env.d.ts <<'EOF'
-          /// <reference types="next" />
-          /// <reference types="next/image-types/global" />
-          EOF
-          pnpm type-check
-          pnpm exec eslint --no-fix \
-            src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts \
-            tests/omniroute-duration-semantics.spec.ts \
-            tests/omniroute-duration-production-path.spec.ts \
-            tests/omniroute-duration-toolbar-render.spec.ts
-
-      - name: Run affected duration tests only
-        working-directory: project/aitoearn-web
-        run: |
-          pnpm exec playwright test \
-            tests/omniroute-duration-semantics.spec.ts \
-            tests/omniroute-duration-production-path.spec.ts \
-            tests/omniroute-duration-toolbar-render.spec.ts \
-            --workers=1
-
-      - name: Commit validated controller and tests only
-        run: |
-          git checkout HEAD^^ -- .github/workflows/omniroute-duration-semantics-validation.yml
-          rm -f .github/workflows/pr2-targeted-controller-tests.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix(video): complete no-duration controller and integration coverage [skip ci]"
-          git push origin HEAD:feature/omniroute-duration-semantics
