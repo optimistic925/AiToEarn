@@ -276,11 +276,12 @@ jobs:
           cp .github/workflows/pr2-targeted-controller-tests.yml /tmp/pr2-targeted.yml
           python - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
           text = Path('/tmp/pr2-targeted.yml').read_text()
           start = text.index("          cat > project/aitoearn-web/tests/omniroute-duration-production-path.spec.ts <<'EOF'\n")
           end = text.index("\n      - name: Install web dependencies", start)
-          commands = text[start:end]
-          Path('/tmp/create-tests.sh').write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + commands.replace('          ', '', 1))
+          commands = dedent(text[start:end])
+          Path('/tmp/create-tests.sh').write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + commands)
           PY
           bash /tmp/create-tests.sh
 
@@ -313,7 +314,7 @@ jobs:
 
       - name: Commit validated controller and tests only
         run: |
-          git checkout HEAD^ -- .github/workflows/omniroute-duration-semantics-validation.yml
+          git checkout HEAD^^ -- .github/workflows/omniroute-duration-semantics-validation.yml
           rm -f .github/workflows/pr2-targeted-controller-tests.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
