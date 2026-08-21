@@ -1,9 +1,9 @@
 import type { DraftGenerationPricingVo, VideoModelInfo } from '../src/api/ai/ai.types'
+import { expect, test } from '@playwright/test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, test } from '@playwright/test'
-import { getVideoModelsCommonStaticConfig } from '../src/components/draft-box/components/AiBatchGenerateBar/utils/constants'
 import { useAiBatchSubmitHandler } from '../src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchSubmitHandler'
+import { getVideoModelsCommonStaticConfig } from '../src/components/draft-box/components/AiBatchGenerateBar/utils/constants'
 import { usePlanDetailStore } from '../src/store/draft-box/planDetailStore'
 import http from '../src/utils/request'
 
@@ -28,7 +28,7 @@ function videoModel(overrides: Partial<VideoModelInfo> = {}): VideoModelInfo {
   }
 }
 
-type PricingCache = {
+interface PricingCache {
   data: DraftGenerationPricingVo | null
   promise: Promise<DraftGenerationPricingVo | null> | null
 }
