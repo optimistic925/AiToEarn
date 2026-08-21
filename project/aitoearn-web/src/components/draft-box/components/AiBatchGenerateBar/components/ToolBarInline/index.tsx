@@ -9,6 +9,7 @@ import type { ToolBarInlineProps } from './types'
 import { memo } from 'react'
 import { useTransClient } from '@/app/i18n/client'
 import { useAiBatchGenerateBarLocalState } from '../../store'
+import { hasSelectableVideoDuration } from '../../utils/durationControl'
 import PlatformSelector from '../PlatformSelector'
 import { AspectRatioSelect } from './components/AspectRatioSelect'
 import { CreditsSubmitControl } from './components/CreditsSubmitControl'
@@ -100,6 +101,7 @@ const ToolBarInline = memo(
       isVideoMultiSelect,
       modelOptionsCount,
       selectedModelValues,
+      selectedVideoModelInfos,
       selectedVideoModelParamInfos,
       supportedRatios,
     } = useToolBarDerivedData({
@@ -119,6 +121,9 @@ const ToolBarInline = memo(
       videoModelSelectionMode,
       videoResolutions,
     })
+
+    const singleVideoModelHasDurationControl
+      = hasSelectableVideoDuration(selectedVideoModelInfos[0])
 
     const {
       handleImageCountChange,
@@ -269,7 +274,7 @@ const ToolBarInline = memo(
           />
         )}
 
-        {isVideoMode && !isVideoMultiSelect && (
+        {isVideoMode && !isVideoMultiSelect && singleVideoModelHasDurationControl && (
           <DurationSelect
             draftDuration={draftDuration}
             duration={duration}

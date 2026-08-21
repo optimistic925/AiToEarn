@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/utils/className'
 import { ratioToPreviewSize } from '../../../../utils/constants'
+import { hasSelectableVideoDuration } from '../../../../utils/durationControl'
 import { pillClass } from '../../utils/styles'
 
 export function VideoModelParamsSelect({
@@ -50,6 +51,7 @@ export function VideoModelParamsSelect({
                 = videoModelOptions.find(item => item.value === model.name)?.label
                   || model.description
                   || model.name
+              const durationSelectable = hasSelectableVideoDuration(model)
               const durationValue
                 = draftVideoModelDurations[model.name] ?? params.duration ?? durationLimits.min
               const durationLocked
@@ -68,8 +70,12 @@ export function VideoModelParamsSelect({
                       <span>{params.resolution || '-'}</span>
                       <span className="text-muted-foreground/60">·</span>
                       <span>{params.aspectRatio || '-'}</span>
-                      <span className="text-muted-foreground/60">·</span>
-                      <span>{`${durationValue}s`}</span>
+                      {durationSelectable && (
+                        <>
+                          <span className="text-muted-foreground/60">·</span>
+                          <span>{`${durationValue}s`}</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -143,34 +149,36 @@ export function VideoModelParamsSelect({
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground">
-                      {labels.duration}
-                    </span>
-                    {durationLocked ? (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                        <Lock className="h-3 w-3" />
-                        {`${durationValue}s`}
+                  {durationSelectable && (
+                    <div className="mt-3 space-y-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        {labels.duration}
                       </span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Slider
-                          value={[durationValue]}
-                          onValueChange={([value]) =>
-                            onVideoModelDurationDraftChange(model.name, value)}
-                          onValueCommit={([value]) =>
-                            onVideoModelDurationCommit(model.name, value, params.duration)}
-                          min={durationLimits.min}
-                          max={durationLimits.max}
-                          step={1}
-                          className="flex-1"
-                        />
-                        <span className="w-8 text-right text-xs text-muted-foreground">
+                      {durationLocked ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground">
+                          <Lock className="h-3 w-3" />
                           {`${durationValue}s`}
                         </span>
-                      </div>
-                    )}
-                  </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Slider
+                            value={[durationValue]}
+                            onValueChange={([value]) =>
+                              onVideoModelDurationDraftChange(model.name, value)}
+                            onValueCommit={([value]) =>
+                              onVideoModelDurationCommit(model.name, value, params.duration)}
+                            min={durationLimits.min}
+                            max={durationLimits.max}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <span className="w-8 text-right text-xs text-muted-foreground">
+                            {`${durationValue}s`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             },
