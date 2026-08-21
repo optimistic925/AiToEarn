@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: omniroute-duration-semantics-${{ github.ref }}
@@ -17,7 +17,6 @@ concurrency:
 
 jobs:
   backend:
-    if: ${{ github.head_ref != 'validation/pr2-controller-duration-cleanup' }}
     name: Backend Typecheck, Lint, Tests, Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -81,7 +80,6 @@ jobs:
         run: pnpm nx run-many --target=build --projects=aitoearn-ai-shared,aitoearn-ai --nxBail --outputStyle=static
 
   web:
-    if: ${{ github.head_ref != 'validation/pr2-controller-duration-cleanup' }}
     name: Web Typecheck, Lint, Tests, Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -138,178 +136,3 @@ jobs:
       - name: Build web
         working-directory: ${{ env.WEB_DIR }}
         run: pnpm build
-
-  targeted-controller:
-    if: ${{ github.head_ref == 'validation/pr2-controller-duration-cleanup' }}
-    name: Controller TypeScript and ESLint
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      WEB_DIR: project/aitoearn-web
-
-    steps:
-      - name: Checkout validation branch
-        uses: actions/checkout@v4
-        with:
-          ref: validation/pr2-controller-duration-cleanup
-          fetch-depth: 0
-
-      - name: Apply metadata-driven controller cleanup
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('project/aitoearn-web/src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts')
-          text = path.read_text()
-
-          def replace_once(old: str, new: str):
-              global text
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'expected exactly one match, found {count}: {old[:120]!r}')
-              text = text.replace(old, new, 1)
-
-          replace_once(
-              "} from '../utils/constants'\nimport {\n  buildAggregateImagePricing,",
-              "} from '../utils/constants'\nimport { hasSelectableVideoDuration } from '../utils/durationControl'\nimport {\n  buildAggregateImagePricing,",
-          )
-
-          replace_once(
-              """              [fallback]: {
-                resolution: fallbackResolution,
-                duration,
-                aspectRatio,
-              },""",
-              """              [fallback]: {
-                resolution: fallbackResolution,
-                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
-                aspectRatio,
-              },""",
-          )
-          replace_once(
-              """              [fallback]: {
-                resolution: fallbackResolution,
-                duration,
-                aspectRatio,
-              },""",
-              """              [fallback]: {
-                resolution: fallbackResolution,
-                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
-                aspectRatio,
-              },""",
-          )
-
-          replace_once(
-              "      const nextPrimaryDuration = nextPrimaryParams?.duration ?? duration\n",
-              "      const nextPrimaryDuration = hasSelectableVideoDuration(modelInfos[0])\n        ? (nextPrimaryParams?.duration ?? duration)\n        : undefined\n",
-          )
-          replace_once(
-              """      if (videoModelSelectionMode === 'single') {
-        setDuration(nextPrimaryDuration)
-        setAspectRatio(nextPrimaryAspectRatio)
-      }""",
-              """      if (videoModelSelectionMode === 'single') {
-        if (nextPrimaryDuration !== undefined)
-          setDuration(nextPrimaryDuration)
-        setAspectRatio(nextPrimaryAspectRatio)
-      }""",
-          )
-          replace_once(
-              "        duration: videoModelSelectionMode === 'single' ? nextPrimaryDuration : duration,\n",
-              """        duration:
-          videoModelSelectionMode === 'single' && nextPrimaryDuration !== undefined
-            ? nextPrimaryDuration
-            : duration,
-""",
-          )
-
-          replace_once(
-              """      if (mode === 'single' && nextPrimaryParams?.duration !== undefined) {
-        setDuration(nextPrimaryParams.duration)
-      }""",
-              """      if (
-        mode === 'single'
-        && hasSelectableVideoDuration(modelInfos[0])
-        && nextPrimaryParams?.duration !== undefined
-      ) {
-        setDuration(nextPrimaryParams.duration)
-      }""",
-          )
-          replace_once(
-              "        duration: mode === 'single' ? (nextPrimaryParams?.duration ?? duration) : duration,\n",
-              """        duration:
-          mode === 'single'
-          && hasSelectableVideoDuration(modelInfos[0])
-          && nextPrimaryParams?.duration !== undefined
-            ? nextPrimaryParams.duration
-            : duration,
-""",
-          )
-
-          replace_once(
-              """            [firstVideoModel]: {
-              resolution: firstVideoResolution,
-              duration: 8,
-              aspectRatio: nextAspectRatio,
-            },""",
-              """            [firstVideoModel]: {
-              resolution: firstVideoResolution,
-              ...(hasSelectableVideoDuration(firstVideoModelInfo) ? { duration: 8 } : {}),
-              aspectRatio: nextAspectRatio,
-            },""",
-          )
-
-          path.write_text(text)
-          PY
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ${{ env.WEB_DIR }}/pnpm-lock.yaml
-
-      - name: Install web dependencies
-        working-directory: ${{ env.WEB_DIR }}
-        run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Type-check affected web project
-        working-directory: ${{ env.WEB_DIR }}
-        run: |
-          cat > next-env.d.ts <<'EOF'
-          /// <reference types="next" />
-          /// <reference types="next/image-types/global" />
-          EOF
-          pnpm type-check
-
-      - name: ESLint controller
-        working-directory: ${{ env.WEB_DIR }}
-        run: pnpm exec eslint --no-fix src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts
-
-      - name: Commit validated controller cleanup
-        run: |
-          git fetch origin feature/omniroute-duration-semantics
-          git show origin/feature/omniroute-duration-semantics:.github/workflows/omniroute-duration-semantics-validation.yml > .github/workflows/omniroute-duration-semantics-validation.yml
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('.github/workflows/omniroute-duration-semantics-validation.yml')
-          text = path.read_text()
-          anchor = "          src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchSubmitHandler.ts\n"
-          addition = anchor + "          src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts\n"
-          if addition not in text:
-              if text.count(anchor) != 1:
-                  raise SystemExit('expected one submit-handler lint anchor')
-              text = text.replace(anchor, addition, 1)
-          path.write_text(text)
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add project/aitoearn-web/src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts .github/workflows/omniroute-duration-semantics-validation.yml
-          git commit -m "fix(video): make controller duration state capability-aware [skip ci]"
-          git push origin HEAD:validation/pr2-controller-duration-cleanup
