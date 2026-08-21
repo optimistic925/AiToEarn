@@ -67,6 +67,7 @@ jobs:
       - name: Run focused duration tests
         working-directory: ${{ env.WEB_DIR }}
         run: >-
+          NODE_OPTIONS="$NODE_OPTIONS --require ./tests/register-playwright-assets.cjs"
           pnpm exec playwright test
           tests/omniroute-duration-semantics.spec.ts
           tests/omniroute-duration-production-path.spec.ts
