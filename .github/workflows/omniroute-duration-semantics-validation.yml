@@ -63,13 +63,33 @@ jobs:
           tests/omniroute-duration-semantics.spec.ts
           tests/omniroute-duration-production-path.spec.ts
           tests/omniroute-duration-toolbar-render.spec.ts
+          tests/toolbar-app/app/layout.tsx
+          tests/toolbar-app/app/page.tsx
 
-      - name: Run focused duration tests
+      - name: Run helper and production submission tests
         working-directory: ${{ env.WEB_DIR }}
         run: >-
           NODE_OPTIONS="$NODE_OPTIONS --require ./tests/register-playwright-assets.cjs"
           pnpm exec playwright test
           tests/omniroute-duration-semantics.spec.ts
           tests/omniroute-duration-production-path.spec.ts
-          tests/omniroute-duration-toolbar-render.spec.ts
           --workers=1
+
+      - name: Install Chromium for toolbar browser proof
+        working-directory: ${{ env.WEB_DIR }}
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run real toolbar browser rendering tests
+        working-directory: ${{ env.WEB_DIR }}
+        run: |
+          pnpm exec next dev tests/toolbar-app --hostname 127.0.0.1 --port 3101 > /tmp/toolbar-next.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3101/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3101/ > /dev/null || { cat /tmp/toolbar-next.log; exit 1; }
+          pnpm exec playwright test tests/omniroute-duration-toolbar-render.spec.ts --workers=1
