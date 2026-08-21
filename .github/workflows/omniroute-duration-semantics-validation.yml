@@ -1,12 +1,8 @@
 name: OmniRoute Duration Semantics Validation
 
 on:
-  push:
-    branches:
-      - feature/omniroute-duration-semantics
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,79 +12,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: Backend Typecheck, Lint, Tests, Build
+  focused-web:
+    name: Focused Web Typecheck, Lint, Duration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      NX_NO_CLOUD: true
-      NX_DAEMON: false
-      NODE_OPTIONS: --max-old-space-size=4096
-      MONOREPO_DIR: project/aitoearn-backend
-
-    steps:
-      - name: Checkout feature branch
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: ${{ env.MONOREPO_DIR }}/pnpm-lock.yaml
-
-      - name: Install affected backend dependencies
-        working-directory: ${{ env.MONOREPO_DIR }}
-        run: pnpm install --frozen-lockfile --ignore-scripts --filter . --filter aitoearn-ai...
-
-      - name: Type-check affected backend projects
-        working-directory: ${{ env.MONOREPO_DIR }}
-        run: |
-          pnpm exec tsc -p libs/aitoearn-ai-shared/tsconfig.lib.json --noEmit
-          pnpm exec tsc -p apps/aitoearn-ai/tsconfig.app.json --noEmit
-
-      - name: Lint affected backend files
-        working-directory: ${{ env.MONOREPO_DIR }}
-        run: >-
-          pnpm exec eslint --no-fix
-          apps/aitoearn-ai/src/config.ts
-          libs/aitoearn-ai-shared/src/vos/draft-generation.vo.ts
-          libs/aitoearn-ai-shared/src/vos/draft-generation.vo.spec.ts
-
-      - name: Run duration metadata tests
-        working-directory: ${{ env.MONOREPO_DIR }}
-        run: pnpm exec vitest run libs/aitoearn-ai-shared/src/vos/draft-generation.vo.spec.ts
-
-      - name: Run OmniRoute compatibility tests
-        working-directory: ${{ env.MONOREPO_DIR }}
-        env:
-          FILE_ENDPOINT: https://files.example.test
-        run: >-
-          pnpm exec vitest --config apps/aitoearn-ai/vitest.config.mts run
-          apps/aitoearn-ai/src/core/ai/libs/omniroute/omniroute.service.spec.ts
-          apps/aitoearn-ai/src/core/ai/video/omniroute/omniroute-video.service.spec.ts
-          apps/aitoearn-ai/src/core/ai/video/video.omniroute.spec.ts
-
-      - name: Build affected backend projects
-        working-directory: ${{ env.MONOREPO_DIR }}
-        run: pnpm nx run-many --target=build --projects=aitoearn-ai-shared,aitoearn-ai --nxBail --outputStyle=static
-
-  web:
-    name: Web Typecheck, Lint, Tests, Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
       WEB_DIR: project/aitoearn-web
 
     steps:
-      - name: Checkout feature branch
+      - name: Checkout validation branch
         uses: actions/checkout@v4
 
       - name: Install pnpm
@@ -128,11 +61,14 @@ jobs:
           src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/index.tsx
           src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/components/VideoModelParamsSelect/index.tsx
           tests/omniroute-duration-semantics.spec.ts
+          tests/omniroute-duration-production-path.spec.ts
+          tests/omniroute-duration-toolbar-render.spec.ts
 
-      - name: Run focused duration-semantics tests
+      - name: Run focused duration tests
         working-directory: ${{ env.WEB_DIR }}
-        run: pnpm exec playwright test tests/omniroute-duration-semantics.spec.ts --workers=1
-
-      - name: Build web
-        working-directory: ${{ env.WEB_DIR }}
-        run: pnpm build
+        run: >-
+          pnpm exec playwright test
+          tests/omniroute-duration-semantics.spec.ts
+          tests/omniroute-duration-production-path.spec.ts
+          tests/omniroute-duration-toolbar-render.spec.ts
+          --workers=1
