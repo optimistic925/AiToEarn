@@ -31,6 +31,7 @@ import {
   getVideoModelResolutions,
   getVideoModelsCommonStaticConfig,
 } from '../utils/constants'
+import { hasSelectableVideoDuration } from '../utils/durationControl'
 import {
   buildAggregateImagePricing,
   buildPersistedMediaSignature,
@@ -358,7 +359,7 @@ export function useAiBatchGenerateBarController({
           ? {
               [fallback]: {
                 resolution: fallbackResolution,
-                duration,
+                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
                 aspectRatio,
               },
             }
@@ -374,7 +375,7 @@ export function useAiBatchGenerateBarController({
           ? {
               [fallback]: {
                 resolution: fallbackResolution,
-                duration,
+                ...(hasSelectableVideoDuration(fallbackModel) ? { duration } : {}),
                 aspectRatio,
               },
             }
@@ -1211,13 +1212,16 @@ export function useAiBatchGenerateBarController({
       }
       const nextPrimaryParams = nextResolvedParams[nextModelType]
       const nextPrimaryResolution = nextPrimaryParams?.resolution ?? nextResolution
-      const nextPrimaryDuration = nextPrimaryParams?.duration ?? duration
+      const nextPrimaryDuration = hasSelectableVideoDuration(modelInfos[0])
+        ? (nextPrimaryParams?.duration ?? duration)
+        : undefined
       const nextPrimaryAspectRatio = nextPrimaryParams?.aspectRatio ?? aspectRatio
       setSelectedVideoModels(models)
       setModelType(nextModelType)
       setResolution(nextPrimaryResolution)
       if (videoModelSelectionMode === 'single') {
-        setDuration(nextPrimaryDuration)
+        if (nextPrimaryDuration !== undefined)
+          setDuration(nextPrimaryDuration)
         setAspectRatio(nextPrimaryAspectRatio)
       }
       setVideoModelResolutions(nextVideoModelResolutions)
@@ -1226,7 +1230,10 @@ export function useAiBatchGenerateBarController({
         selectedVideoModels: models,
         modelType: nextModelType,
         resolution: nextPrimaryResolution,
-        duration: videoModelSelectionMode === 'single' ? nextPrimaryDuration : duration,
+        duration:
+          videoModelSelectionMode === 'single' && nextPrimaryDuration !== undefined
+            ? nextPrimaryDuration
+            : duration,
         aspectRatio: videoModelSelectionMode === 'single' ? nextPrimaryAspectRatio : aspectRatio,
         videoModelResolutions: nextVideoModelResolutions,
         videoModelParams: nextVideoModelParams,
@@ -1344,7 +1351,11 @@ export function useAiBatchGenerateBarController({
       setSelectedVideoModels(nextModels)
       setModelType(nextModelType)
       setResolution(nextPrimaryParams?.resolution ?? nextResolution)
-      if (mode === 'single' && nextPrimaryParams?.duration !== undefined) {
+      if (
+        mode === 'single'
+        && hasSelectableVideoDuration(modelInfos[0])
+        && nextPrimaryParams?.duration !== undefined
+      ) {
         setDuration(nextPrimaryParams.duration)
       }
       if (mode === 'single' && nextPrimaryParams?.aspectRatio) {
@@ -1357,7 +1368,12 @@ export function useAiBatchGenerateBarController({
         selectedVideoModels: nextModels,
         modelType: nextModelType,
         resolution: nextPrimaryParams?.resolution ?? nextResolution,
-        duration: mode === 'single' ? (nextPrimaryParams?.duration ?? duration) : duration,
+        duration:
+          mode === 'single'
+          && hasSelectableVideoDuration(modelInfos[0])
+          && nextPrimaryParams?.duration !== undefined
+            ? nextPrimaryParams.duration
+            : duration,
         aspectRatio:
             mode === 'single' ? (nextPrimaryParams?.aspectRatio ?? aspectRatio) : aspectRatio,
         videoModelResolutions: nextVideoModelResolutions,
@@ -1447,7 +1463,7 @@ export function useAiBatchGenerateBarController({
         ? {
             [firstVideoModel]: {
               resolution: firstVideoResolution,
-              duration: 8,
+              ...(hasSelectableVideoDuration(firstVideoModelInfo) ? { duration: 8 } : {}),
               aspectRatio: nextAspectRatio,
             },
           }
