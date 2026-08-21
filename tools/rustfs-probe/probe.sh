@@ -62,8 +62,16 @@ if aws --endpoint-url "$S3_ENDPOINT" \
   exit 1
 fi
 
-if grep -Eqi '404|Not Found|NoSuchKey' /tmp/head.err; then
-  echo "RUSTFS_DELETE_VERIFY=PASS"
+if grep -Eqi 'NoSuchKey|An error occurred \(404\) when calling the HeadObject operation: Not Found' /tmp/head.err; then
+  if aws --endpoint-url "$S3_ENDPOINT" \
+    s3api head-bucket \
+    --bucket "$S3_BUCKET" >/dev/null 2>/tmp/bucket.err; then
+    echo "RUSTFS_DELETE_VERIFY=PASS"
+  else
+    echo "RUSTFS_DELETE_VERIFY=FAIL"
+    echo "ERROR: object was not found, but bucket/endpoint verification failed"
+    exit 1
+  fi
 else
   echo "RUSTFS_DELETE_VERIFY=FAIL"
   echo "ERROR: delete verification request failed for a reason other than object-not-found"
