@@ -1,9 +1,10 @@
 import type { VideoModelInfo } from '../src/api/ai/ai.types'
 import type { ToolBarInlineProps } from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/types'
 import type { AiBatchGenerateBarLocalState } from '../src/components/draft-box/components/AiBatchGenerateBar/store'
+import { PassThrough } from 'node:stream'
 import { expect, test } from '@playwright/test'
 import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderToPipeableStream } from 'react-dom/server'
 import ToolBarInline from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline'
 
 function videoModel(name: string, durationControl: 'select' | 'none'): VideoModelInfo {
@@ -25,7 +26,7 @@ function videoModel(name: string, durationControl: 'select' | 'none'): VideoMode
   }
 }
 
-function renderToolbar(model: VideoModelInfo) {
+function renderToolbar(model: VideoModelInfo): Promise<string> {
   const fallbackState: AiBatchGenerateBarLocalState = {
     promptValue: '',
     promptEditorOpen: false,
@@ -96,17 +97,34 @@ function renderToolbar(model: VideoModelInfo) {
     },
   }
 
-  return renderToStaticMarkup(createElement(ToolBarInline, props))
+  return new Promise((resolve, reject) => {
+    const output = new PassThrough()
+    let html = ''
+
+    output.setEncoding('utf8')
+    output.on('data', chunk => html += chunk)
+    output.on('end', () => resolve(html))
+    output.on('error', reject)
+
+    const stream = renderToPipeableStream(createElement(ToolBarInline, props), {
+      onAllReady() {
+        stream.pipe(output)
+      },
+      onError(error) {
+        reject(error)
+      },
+    })
+  })
 }
 
 for (const modelName of ['veoaifree-web/veo', 'veoaifree-web/seedance']) {
-  test(`${modelName} renders the real toolbar without the duration selector`, () => {
-    const html = renderToolbar(videoModel(modelName, 'none'))
+  test(`${modelName} renders the real toolbar without the duration selector`, async () => {
+    const html = await renderToolbar(videoModel(modelName, 'none'))
     expect(html).not.toContain('data-testid="draftbox-ai-duration"')
   })
 }
 
-test('selectable-duration model renders the real toolbar duration selector baseline', () => {
-  const html = renderToolbar(videoModel('selectable-video', 'select'))
+test('selectable-duration model renders the real toolbar duration selector baseline', async () => {
+  const html = await renderToolbar(videoModel('selectable-video', 'select'))
   expect(html).toContain('data-testid="draftbox-ai-duration"')
 })
