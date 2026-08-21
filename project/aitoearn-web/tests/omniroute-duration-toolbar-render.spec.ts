@@ -1,9 +1,9 @@
 import type { VideoModelInfo } from '../src/api/ai/ai.types'
-import type { AiBatchGenerateBarLocalState } from '../src/components/draft-box/components/AiBatchGenerateBar/store'
 import type { ToolBarInlineProps } from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/types'
+import type { AiBatchGenerateBarLocalState } from '../src/components/draft-box/components/AiBatchGenerateBar/store'
+import { expect, test } from '@playwright/test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, test } from '@playwright/test'
 import ToolBarInline from '../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline'
 
 function videoModel(name: string, durationControl: 'select' | 'none'): VideoModelInfo {
