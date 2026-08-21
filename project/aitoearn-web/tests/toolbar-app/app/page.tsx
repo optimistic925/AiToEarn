@@ -3,8 +3,8 @@
 import type { VideoModelInfo } from '../../../src/api/ai/ai.types'
 import type { ToolBarInlineProps } from '../../../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/types'
 import type { AiBatchGenerateBarLocalState } from '../../../src/components/draft-box/components/AiBatchGenerateBar/store'
-import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import ToolBarInline from '../../../src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline'
 
 function videoModel(name: string): VideoModelInfo {
