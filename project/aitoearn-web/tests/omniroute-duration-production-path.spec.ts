@@ -47,8 +47,8 @@ function primePricing(videoModels: VideoModelInfo[]) {
 }
 
 type SubmitParams = Parameters<typeof useAiBatchSubmitHandler>[0]
-
-type StoreCreate = typeof usePlanDetailStore.getState()['createBatchGenerationWithModels']
+type StoreState = ReturnType<typeof usePlanDetailStore.getState>
+type StoreCreate = StoreState['createBatchGenerationWithModels']
 
 function renderSubmitHandler(params: SubmitParams) {
   let submit: (() => Promise<void>) | undefined
