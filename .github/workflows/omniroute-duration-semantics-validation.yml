@@ -124,6 +124,7 @@ jobs:
           src/types/video-duration-control.d.ts
           src/components/draft-box/components/AiBatchGenerateBar/utils/durationControl.ts
           src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchSubmitHandler.ts
+          src/components/draft-box/components/AiBatchGenerateBar/hooks/useAiBatchGenerateBarController.ts
           src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/index.tsx
           src/components/draft-box/components/AiBatchGenerateBar/components/ToolBarInline/components/VideoModelParamsSelect/index.tsx
           tests/omniroute-duration-semantics.spec.ts
